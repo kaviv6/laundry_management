@@ -1,6 +1,4 @@
-from datetime import datetime
-from odoo import api, Command, fields, models, _
-from odoo.addons.test_import_export.models.models_export_impex import compute_fn
+from odoo import api, fields, models, _
 
 
 class LaundryOrder(models.Model):
