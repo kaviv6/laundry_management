@@ -1,0 +1,7 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_laundry_order_user,access.laundry.order.user,model_laundry_order,group_laundry_user,1,1,0,0
+access_laundry_order_manager,access.laundry.order.manager,model_laundry_order,group_laundry_manager,1,1,1,1
+access_laundry_order_line_user,access.laundry.order.line.user,model_laundry_order_line,group_laundry_user,1,1,0,0
+access_laundry_order_line_manager,access.laundry.order.line.manager,model_laundry_order_line,group_laundry_manager,1,1,1,1
+access_washing_type_user,access.washing.type.user,model_washing_type,group_laundry_user,1,0,0,0
+access_washing_type_manager,access.washing.type.manager,model_washing_type,group_laundry_manager,1,1,1,1

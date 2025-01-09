@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <!--Demo service product-->
+    <record id="product_category_laundry_service" model="product.category">
+        <field name="name">Laundry Service</field>
+    </record>
+
+    <record id="product_product_laundry_service" model="product.product">
+        <field name="name">Laundry Service</field>
+        <field name="type">service</field>
+        <field name="categ_id" ref="product_category_laundry_service"/>
+        <field name="default_code">LS-01</field>
+    </record>
+
+    <!--Account journal For invoices-->
+    <record id="laundry_journal" model="account.journal">
+        <field name="name">Laundry Journal</field>
+        <field name="type">sale</field>
+        <field name="code">LINV</field>
+    </record>
+
+    <!--Laundry user-->
+    <record id="laundry_user" model="res.users">
+        <field name="name">user</field>
+        <field name="login">user@gmail.com</field>
+        <field name="password">user@123</field>
+        <field name="groups_id"
+               eval="[Command.set([ref('base.group_user'), ref('laundry_management.group_laundry_user')])]"/>
+    </record>
+
+    <!--Laundry Washing Types-->
+    <record id="washing_type_normal_wash" model="washing.type">
+        <field name="name">Normal Wash</field>
+        <field name="assigned_person_id" ref="laundry_management.laundry_user"/>
+        <field name="amount">15</field>
+    </record>
+
+    <record id="washing_type_DC" model="washing.type">
+        <field name="name">Dry Clean</field>
+        <field name="assigned_person_id" ref="laundry_management.laundry_user"/>
+        <field name="amount">50</field>
+    </record>
+
+    <record id="washing_type_petrol_wash" model="washing.type">
+        <field name="name">Petrol Wash</field>
+        <field name="assigned_person_id" ref="laundry_management.laundry_user"/>
+        <field name="amount">130</field>
+    </record>
+
+    <record id="washing_type_bleaching" model="washing.type">
+        <field name="name">Bleaching</field>
+        <field name="assigned_person_id" ref="laundry_management.laundry_user"/>
+        <field name="amount">60</field>
+    </record>
+
+    <record id="washing_type_stain_removal" model="washing.type">
+        <field name="name">Stain Removal</field>
+        <field name="assigned_person_id" ref="laundry_management.laundry_user"/>
+        <field name="amount">40</field>
+    </record>
+
+</odoo>
