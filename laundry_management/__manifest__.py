@@ -16,6 +16,7 @@
         'data/ir_sequenca_data.xml',
         'views/laundry_order_views.xml',
         'views/washing_type_views.xml',
+        'views/acount_move_view.xml',
         # 'views/label_templates.xml',
     ],
     'installable': True,
