@@ -20,11 +20,16 @@ class MailComposeWizard(models.TransientModel):
         if self.attachment_ids:
             text += '%0A%0A Other Attachments :'
             for attachment in self.attachment_ids:
+                # Generate an access token for the attachment
                 attachment.generate_access_token()
-                text += '%0A%0A'
-                text += base_url + '/web/content/ir.attachment/' + \
-                        str(attachment.id) + '/datas?access_token=' + \
-                        attachment.access_token
+                file_url = base_url + '/web/content/ir.attachment/' + \
+                           str(attachment.id) + '/datas?access_token=' + \
+                           attachment.access_token
+
+                # Add the download URL with the file
+                # Add query parameter to force download (e.g., ?download=1)
+                download_url = f"{file_url}&download=1"
+                text += '%0A' + download_url
 
         context = dict(self._context or {})
         active_id = context.get('active_id', False)
@@ -44,12 +49,12 @@ class MailComposeWizard(models.TransientModel):
                 'message_type': 'comment',
             })
 
-    # Generate the WhatsApp URL with the message
+        # Generate the WhatsApp URL with the message (with attachments included)
         url = f"https://api.whatsapp.com/send?phone={phone}&text={text}"
 
-    # Return the URL action to open WhatsApp
+        # Return the URL action to open WhatsApp
         return {
-        'type': 'ir.actions.act_url',
-        'url': url,
-        'target': 'new',
-    }
+            'type': 'ir.actions.act_url',
+            'url': url,
+            'target': 'new',
+        }

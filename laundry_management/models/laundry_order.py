@@ -12,8 +12,6 @@ class LaundryOrder(models.Model):
     invoice_count = fields.Integer(compute='_compute_invoice_count',
                                    string='#Invoice',
                                    help="Number of invoice count")
-    work_count = fields.Integer(compute='_compute_work_count', string='# Works',
-                                help="Number of work count")
     partner_id = fields.Many2one('res.partner', string='Customer',
                                  readonly=True,
                                  required=True,
