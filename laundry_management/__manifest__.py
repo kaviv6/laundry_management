@@ -9,6 +9,9 @@
     'author': 'Keval Vaja',
     'maintainer': 'Keval Vaja',
     'depends': ['l10n_in', 'account', 'product','point_of_sale'],
+    'external_dependencies': {
+        'python': ['xlsxwriter'],
+    },
     'data': [
         'security/laundry_management_security.xml',
         'security/ir.model.access.csv',
