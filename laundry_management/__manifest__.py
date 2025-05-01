@@ -9,6 +9,7 @@
     'author': 'Keval Vaja',
     'maintainer': 'Keval Vaja',
     'depends': ['l10n_in', 'account', 'product'],
+
     'data': [
         'security/laundry_management_security.xml',
         'security/ir.model.access.csv',
