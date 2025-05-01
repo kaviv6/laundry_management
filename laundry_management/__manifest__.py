@@ -8,7 +8,7 @@
                    'service',
     'author': 'Keval Vaja',
     'maintainer': 'Keval Vaja',
-    'depends': ['l10n_in', 'account', 'product','point_of_sale'],
+    'depends': ['l10n_in', 'account', 'product'],
     'data': [
         'security/laundry_management_security.xml',
         'security/ir.model.access.csv',
@@ -18,9 +18,10 @@
         'views/service_type_views.xml',
         'views/acount_move_view.xml',
         'wizard/mail_compose_views.xml',
-        'views/pos_config_views.xml',
     ],
+
     'installable': True,
     'auto_install': False,
     'application': True,
+    'license': 'LGPL-3',
 }
