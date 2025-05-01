@@ -9,26 +9,20 @@ class MailComposeWizard(models.TransientModel):
     def action_send_invoice(self):
         text = html2plaintext(self.body or "")
 
-        # Ensure the partner has a mobile number
         if not self.partner_ids[0].mobile:
             raise UserError('Partner Mobile Number Not Exist!')
 
         phone = str(self.partner_ids[0].mobile)
         base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url')
 
-        # Check if there are attachments and generate the links
         if self.attachment_ids:
             text += '%0A%0A Other Attachments :'
             for attachment in self.attachment_ids:
-                # Generate an access token for the attachment
                 attachment.generate_access_token()
                 file_url = base_url + '/web/content/ir.attachment/' + \
                            str(attachment.id) + '/datas?access_token=' + \
                            attachment.access_token
-
-                # Add the download URL with the file
-                # Add query parameter to force download (e.g., ?download=1)
-                download_url = f"{file_url}&download=1"
+                download_url = file_url + '&download=1'
                 text += '%0A' + download_url
 
         context = dict(self._context or {})
@@ -36,7 +30,6 @@ class MailComposeWizard(models.TransientModel):
         active_model = context.get('active_model', False)
 
         if text and active_id and active_model:
-            # Clean and format the text for the message
             message = str(text).replace('*', '').replace('_', '').replace('%0A', '<br/>').replace('%20', ' ').replace(
                 '%26', '&')
 
@@ -48,11 +41,7 @@ class MailComposeWizard(models.TransientModel):
                 'body': message or False,
                 'message_type': 'comment',
             })
-
-        # Generate the WhatsApp URL with the message (with attachments included)
-        url = f"https://api.whatsapp.com/send?phone={phone}&text={text}"
-
-        # Return the URL action to open WhatsApp
+        url = "https://api.whatsapp.com/send?phone=" + phone + "&text=" + text
         return {
             'type': 'ir.actions.act_url',
             'url': url,
