@@ -9,7 +9,7 @@ class AccountMove(models.Model):
             # Get the partner's mobile number
             partner = self.partner_id
             self.ensure_one()
-            if not partner.mobile:
+            if not partner.phone:
                 raise UserError(_("Partner Mobile Number Not Exist !"))
 
             template = self.env.ref(

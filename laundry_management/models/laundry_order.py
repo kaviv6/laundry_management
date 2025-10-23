@@ -1,3 +1,5 @@
+import base64
+
 from odoo import api, fields, models, _
 
 
@@ -34,6 +36,7 @@ class LaundryOrder(models.Model):
                                   help="Name of currency",default=lambda self:self.env.company.currency_id.id)
     note = fields.Text(string='Terms and conditions',
                        help='Add terms and conditions')
+    pickup_request_ids = fields.One2many('laundry.pickup.request', 'order_id', string='Pickup Requests', readonly=True)
     state = fields.Selection([
         ('draft', 'Draft'),
         ('order', 'Laundry Order'),
@@ -129,13 +132,91 @@ class LaundryOrder(models.Model):
                 }
             return value
 
+    def action_view_pickups(self):
+        self.ensure_one()
+        # Find related pickup requests via reverse M2O
+        pickups = self.env['laundry.pickup.request'].search([('order_id', '=', self.id)])
+        if not pickups:
+            return False
+        if len(pickups) == 1:
+            return {
+                'type': 'ir.actions.act_window',
+                'name': _('Pickup Request'),
+                'res_model': 'laundry.pickup.request',
+                'view_mode': 'form',
+                'res_id': pickups.id,
+                'target': 'current',
+            }
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Pickup Requests'),
+            'res_model': 'laundry.pickup.request',
+            'view_mode': 'list,form',
+            'domain': [('id', 'in', pickups.ids)],
+            'target': 'current',
+        }
+    def process_close_invoice_and_email(self):
+        """Close the order, create and post invoice, email PDF to customer.
+
+        This reuses the same logic the cron uses but for a single order.
+        """
+        self.ensure_one()
+
+        # Close order
+        self.close_order()
+
+        # Create and post invoice
+        invoice = self.action_create_invoice()
+        if not invoice:
+            return False
+
+        # Generate invoice PDF
+        pdf, _ = self.env['ir.actions.report']._render_qweb_pdf(
+            'account.account_invoices', invoice.id
+        )
+        pdf_name = f"{invoice.name or 'Invoice'}.pdf"
+
+        attachment = self.env['ir.attachment'].create({
+            'name': pdf_name,
+            'type': 'binary',
+            'datas': base64.b64encode(pdf),
+            'res_model': 'account.move',
+            'res_id': invoice.id,
+            'mimetype': 'application/pdf',
+        })
+
+        # Try to use standard account invoice email template
+        template = self.env.ref('account.email_template_edi_invoice', raise_if_not_found=False)
+        partner_email = self.partner_id.email
+        if template and partner_email:
+            template.send_mail(invoice.id, force_send=True, email_values={
+                'email_to': partner_email,
+                'attachment_ids': [attachment.id],
+            })
+
+        return invoice
+
+    @api.model
+    def cron_close_and_invoice_draft_orders(self):
+        """Scheduled job: On 1st of each month, close all draft laundry orders,
+        create and post invoices, and email the invoice PDF to the customer."""
+
+        # Only execute if there are draft orders
+        draft_orders = self.search([('state', '=', 'draft')])
+        if not draft_orders:
+            return True
+
+        for order in draft_orders:
+            order.process_close_invoice_and_email()
+
+        return True
 
 class LaundryOrderLine(models.Model):
     """Laundry order lines generating model"""
     _name = 'laundry.order.line'
     _description = "Laundry Order Line"
 
-    date = fields.Date(string='Service Date',default=fields.date.today())
+    date = fields.Date(string='Service Date',default=fields.Date.today())
     product_id = fields.Many2one('product.product', string='service',
                                  required=True, help="Name of the product", default=lambda self :self.env.ref('laundry_management.product_product_laundry_service'))
     qty = fields.Integer(string='No of items', required=True,

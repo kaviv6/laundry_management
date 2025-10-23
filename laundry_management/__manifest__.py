@@ -1,6 +1,6 @@
 {
     'name': 'Laundry Management',
-    'version': '18.0.0.1',
+    'version': '1.0',
     "category": "Industries",
     "sequence": 1,
     'summary': """Complete Laundry Service Management""",
@@ -18,6 +18,7 @@
         'views/laundry_order_views.xml',
         'views/service_type_views.xml',
         'views/acount_move_view.xml',
+        'views/laundry_pickup_request_views.xml',
         'wizard/mail_compose_views.xml',
     ],
 

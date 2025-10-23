@@ -1,4 +1,6 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_laundry_pickup_request,access.laundry.pickup.request,model_laundry_pickup_request,base.group_user,1,1,1,1
+access_laundry_pickup_request_line_user,access.laundry.pickup.request.line.user,model_laundry_pickup_request_line,base.group_user,1,1,1,1
 access_laundry_order_manager,access.laundry.order.manager,model_laundry_order,group_laundry_manager,1,1,1,1
 access_laundry_order_line_manager,access.laundry.order.line.manager,model_laundry_order_line,group_laundry_manager,1,1,1,1
 access_service_type_manager,access.washing.type.manager,model_service_type,group_laundry_manager,1,1,1,1

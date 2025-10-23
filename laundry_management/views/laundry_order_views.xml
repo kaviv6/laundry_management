@@ -9,11 +9,11 @@
                 <header>
                     <button name="close_order" class="oe_highlight"
                             string="Close Order" type="object"
-                            invisible="state not in 'draft'"/>
+                            invisible="pickup_request_ids or state not in 'draft'"/>
                     <button name="action_create_invoice" class="oe_highlight"
-                            string="Create Invoice" type="object" invisible="state != 'order'"/>
+                            string="Create Invoice" type="object" invisible="pickup_request_ids or state != 'order'"/>
                     <button name="action_cancel_order" string="Cancel"
-                            type="object" invisible="state not in 'draft'"/>
+                            type="object" invisible="pickup_request_ids or state not in 'draft'"/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="draft,order"/>
                 </header>
@@ -26,6 +26,11 @@
                             <field string="Invoice" name="invoice_count"
                                    widget="statinfo"/>
                         </button>
+                        <button name='action_view_pickups'
+                                class="oe_stat_button" type="object"
+                                icon="fa-external-link"
+                                string="Pickup Requests"
+                                invisible="not pickup_request_ids"/>
                     </div>
                     <div class="oe_title">
                         <h1>
@@ -56,9 +61,6 @@
                                     <field name="description"/>
                                     <field name="qty"/>
                                     <field name="service_type_id"/>
-<!--                                    <field name="show_die_color"/>-->
-<!--                                    <field name="die_color" column_invisible="show_die_color == False"/>-->
-
                                     <field name="amount"/>
                                 </list>
                             </field>

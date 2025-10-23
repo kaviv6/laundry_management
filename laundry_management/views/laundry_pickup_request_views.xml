@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="laundry_pickup_request_view_form" model="ir.ui.view">
+        <field name="name">laundry.pickup.request.form</field>
+        <field name="model">laundry.pickup.request</field>
+        <field name="arch" type="xml">
+            <form string="Laundry Pickup Request">
+                <header>
+                    <button name="action_schedule" type="object" string="Schedule" invisible="state != 'draft'" class="btn-primary"/>
+                    <button name="action_pickup" type="object" string="Pickup" invisible="state != 'scheduled'" class="btn-secondary"/>
+                    <button name="action_deliver" type="object" string="Deliver To Customer" invisible="state != 'picked'" class="btn-primary"/>
+                    <button name="action_cancel" type="object" string="Cancel" invisible="state in ['delivered', 'cancel']" class="btn-secondary"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,scheduled,picked"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button type="object" name="action_open_map" class="oe_stat_button" icon="fa-map-marker" string="Map"/>
+                        <button type="object" name="action_view_order" class="oe_stat_button" icon="fa-external-link" string="Laundry Order" invisible="order_id  == False"/>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="name" readonly="1"/>
+                            <field name="partner_id" readonly="state != 'draft'"/>
+                            <field name="street" readonly="1"/>
+                            <field name="street2" readonly="1"/>
+                            <field name="city" readonly="1"/>
+                            <field name="zip" readonly="1"/>
+                            <field name="state_id" readonly="1"/>
+                            <field name="country_id" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="schedule_date" readonly="state != 'draft'"/>
+                            <field name="pickup_date" readonly="1"/>
+                            <field name="currency_id" groups="base.group_no_one" readonly="state != 'draft'"/>
+                            <field name="total_amount" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Lines">
+                            <field name="line_ids" readonly="state != 'draft'">
+                                <list editable="bottom">
+                                    <field name="product_id"/>
+                                    <field name="service_type_id"/>
+                                    <field name="qty"/>
+                                    <field name="price_unit" readonly="1"/>
+                                    <field name="amount" readonly="1"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="laundry_pickup_request_view_tree" model="ir.ui.view">
+        <field name="name">laundry.pickup.request.tree</field>
+        <field name="model">laundry.pickup.request</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="schedule_date"/>
+                <field name="pickup_date"/>
+                <field name="total_amount"/>
+                <field name="state"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="laundry_pickup_request_action" model="ir.actions.act_window">
+        <field name="name">Pickup Requests</field>
+        <field name="res_model">laundry.pickup.request</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="laundry_pickup_request_menu"
+              name="Pickup Requests"
+              parent="laundry_management.laundry_management_menu"
+              action="laundry_pickup_request_action"
+              sequence="40"/>
+</odoo>
+

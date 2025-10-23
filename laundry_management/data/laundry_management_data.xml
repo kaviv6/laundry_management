@@ -1,5 +1,18 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <odoo>
+
+    <!-- Cron: Close and invoice draft laundry orders monthly -->
+    <record id="ir_cron_laundry_close_and_invoice" model="ir.cron">
+        <field name="name">Laundry: Close and Invoice Draft Orders</field>
+        <field name="model_id" ref="model_laundry_order"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_close_and_invoice_draft_orders()</field>
+        <field name="active">True</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">months</field>
+        <field name="nextcall"
+            eval="(DateTime.now() + relativedelta(day=1, months=1)).strftime('%Y-%m-%d 04:00:00')"/>
+    </record>
     <!--Demo service product-->
     <record id="product_category_laundry_service" model="product.category">
         <field name="name">Laundry Service</field>
@@ -18,7 +31,7 @@
         <field name="name">user</field>
         <field name="login">user@gmail.com</field>
         <field name="password">user@123</field>
-        <field name="groups_id"
+        <field name="group_ids"
                eval="[Command.set([ref('base.group_user')])]"/>
     </record>
 
