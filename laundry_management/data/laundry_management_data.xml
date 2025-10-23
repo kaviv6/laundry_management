@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="UTF-8" ?>
 <odoo>
 
     <!-- Cron: Close and invoice draft laundry orders monthly -->
@@ -26,55 +26,55 @@
     </record>
 
 
-    <!--Laundry user-->
-    <record id="laundry_user" model="res.users">
-        <field name="name">user</field>
-        <field name="login">user@gmail.com</field>
-        <field name="password">user@123</field>
-        <field name="group_ids"
-               eval="[Command.set([ref('base.group_user')])]"/>
-    </record>
+<!--    &lt;!&ndash;Laundry user&ndash;&gt;-->
+<!--    <record id="laundry_user" model="res.users">-->
+<!--        <field name="name">user</field>-->
+<!--        <field name="login">user@gmail.com</field>-->
+<!--        <field name="password">user@123</field>-->
+<!--        <field name="group_ids"-->
+<!--               eval="[Command.set([ref('base.group_user')])]"/>-->
+<!--    </record>-->
 
     <!--Laundry service Types-->
     <record id="service_type_normal_wash" model="service.type">
         <field name="name">Normal Wash</field>
-        <field name="assigned_person_id" ref="laundry_management.laundry_user"/>
+        <field name="assigned_person_id" ref="base.user_root"/>
         <field name="amount">15</field>
     </record>
 
     <record id="service_type_DC" model="service.type">
         <field name="name">Dry Clean</field>
-        <field name="assigned_person_id" ref="laundry_management.laundry_user"/>
+        <field name="assigned_person_id" ref="base.user_root"/>
         <field name="amount">50</field>
     </record>
 
     <record id="service_type_petrol_wash" model="service.type">
         <field name="name">Petrol Wash</field>
-        <field name="assigned_person_id" ref="laundry_management.laundry_user"/>
+        <field name="assigned_person_id" ref="base.user_root"/>
         <field name="amount">130</field>
     </record>
 
     <record id="service_type_bleaching" model="service.type">
         <field name="name">Bleaching</field>
-        <field name="assigned_person_id" ref="laundry_management.laundry_user"/>
+        <field name="assigned_person_id" ref="base.user_root"/>
         <field name="amount">60</field>
     </record>
 
     <record id="service_type_stain_removal" model="service.type">
         <field name="name">Stain Removal</field>
-        <field name="assigned_person_id" ref="laundry_management.laundry_user"/>
+        <field name="assigned_person_id" ref="base.user_root"/>
         <field name="amount">40</field>
     </record>
 
     <record id="service_type_steam_press" model="service.type">
         <field name="name">Steam press</field>
-        <field name="assigned_person_id" ref="laundry_management.laundry_user"/>
+        <field name="assigned_person_id" ref="base.user_root"/>
         <field name="amount">30</field>
     </record>
 
     <record id="service_type_roll_press" model="service.type">
         <field name="name">Roll Press</field>
-        <field name="assigned_person_id" ref="laundry_management.laundry_user"/>
+        <field name="assigned_person_id" ref="base.user_root"/>
         <field name="amount">80</field>
     </record>
 

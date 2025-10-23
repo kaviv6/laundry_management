@@ -1,7 +1,8 @@
 import base64
+import logging
 
 from odoo import api, fields, models, _
-
+_logger = logging.getLogger(__name__)
 
 class LaundryOrder(models.Model):
     """laundry orders generating model"""
@@ -25,7 +26,7 @@ class LaundryOrder(models.Model):
                                  help="Date of order")
     laundry_person_id = fields.Many2one('res.users', string='Laundry Person',
                                         required=True,
-                                        help="Name of laundry person",default=lambda self:self.env.user)
+                                        help="Name of laundry person", default=lambda self: self.env.user)
     order_line_ids = fields.One2many('laundry.order.line', 'laundry_id',
                                      required=True, ondelete='cascade',
                                      help="Order lines of laundry orders")
@@ -33,7 +34,7 @@ class LaundryOrder(models.Model):
                                 store=True,
                                 help="To get the Total amount")
     currency_id = fields.Many2one("res.currency", string="Currency",
-                                  help="Name of currency",default=lambda self:self.env.company.currency_id.id)
+                                  help="Name of currency", default=lambda self: self.env.company.currency_id.id)
     note = fields.Text(string='Terms and conditions',
                        help='Add terms and conditions')
     pickup_request_ids = fields.One2many('laundry.pickup.request', 'order_id', string='Pickup Requests', readonly=True)
@@ -51,7 +52,6 @@ class LaundryOrder(models.Model):
         for vals in vals_list:
             vals['name'] = self.env['ir.sequence'].next_by_code('laundry.order')
         return super().create(vals_list)
-
 
     @api.depends('order_line_ids')
     def _compute_total_amount(self):
@@ -100,7 +100,6 @@ class LaundryOrder(models.Model):
         for order in self:
             order.invoice_count = len(order.env['account.move'].search(
                 [('invoice_origin', '=', order.name)]))
-
 
     def action_view_invoice(self):
         """Function for viewing Laundry orders invoices."""
@@ -155,6 +154,7 @@ class LaundryOrder(models.Model):
             'domain': [('id', 'in', pickups.ids)],
             'target': 'current',
         }
+
     def process_close_invoice_and_email(self):
         """Close the order, create and post invoice, email PDF to customer.
 
@@ -207,18 +207,22 @@ class LaundryOrder(models.Model):
             return True
 
         for order in draft_orders:
-            order.process_close_invoice_and_email()
-
+            try:
+                order.process_close_invoice_and_email()
+            except Exception as e:
+                _logger.error("Error processing laundry order %s: %s", order.name, e)
         return True
+
 
 class LaundryOrderLine(models.Model):
     """Laundry order lines generating model"""
     _name = 'laundry.order.line'
     _description = "Laundry Order Line"
 
-    date = fields.Date(string='Service Date',default=fields.Date.today())
+    date = fields.Date(string='Service Date', default=fields.Date.today())
     product_id = fields.Many2one('product.product', string='service',
-                                 required=True, help="Name of the product", default=lambda self :self.env.ref('laundry_management.product_product_laundry_service'))
+                                 required=True, help="Name of the product", default=lambda self: self.env.ref(
+            'laundry_management.product_product_laundry_service'))
     qty = fields.Integer(string='No of items', required=True,
                          help="Number of quantity")
     description = fields.Text(string='Description',
@@ -230,8 +234,7 @@ class LaundryOrderLine(models.Model):
                           help='Total amount of the line.')
     laundry_id = fields.Many2one('laundry.order', string='Laundry Order',
                                  help='Corresponding laundry order')
-    price_unit = fields.Float(string='Unit Price',compute='compute_price_unit')
-
+    price_unit = fields.Float(string='Unit Price', compute='compute_price_unit')
 
     @api.depends('service_type_id')
     def compute_price_unit(self):
@@ -239,7 +242,6 @@ class LaundryOrderLine(models.Model):
         for line in self:
             unit_price = line.service_type_id.amount
             line.price_unit = unit_price
-
 
     @api.depends('service_type_id', 'qty')
     def _compute_amount(self):
