@@ -111,8 +111,8 @@
     <menuitem id="laundry_management_menu" name="Laundry Management"
               web_icon="laundry_management,static/description/icon.png"/>
     <menuitem id="laundry_management_sub_menu" name="Laundry Management"
-              parent="laundry_management_menu" sequence="1"/>
+              parent="laundry_management.laundry_management_menu" sequence="1"/>
     <menuitem id="laundry_management_menu_order" name="Laundry Order"
-              parent="laundry_management_sub_menu"
+              parent="laundry_management.laundry_management_sub_menu"
               action="laundry_order_action" sequence="1"/>
 </odoo>
