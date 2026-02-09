@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="action_report_laundry_pricelist" model="ir.actions.report">
+            <field name="name">Laundry Pricelist</field>
+            <field name="model">laundry.pricelist</field>
+            <field name="report_type">qweb-pdf</field>
+            <field name="report_name">laundry_management.report_laundry_pricelist_template</field>
+            <field name="report_file">laundry_management.report_laundry_pricelist_template</field>
+            <field name="binding_model_id" ref="model_laundry_pricelist"/>
+            <field name="binding_type">report</field>
+        </record>
+    </data>
+</odoo>

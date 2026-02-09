@@ -9,3 +9,7 @@ access_laundry_order_line_manager,access.laundry.order.line.manager,model_laundr
 access_laundry_pickup_request_manager,access.laundry.pickup.request.manager,model_laundry_pickup_request,laundry_management.group_laundry_manager,1,1,1,1
 access_laundry_pickup_request_line_manager,access.laundry.pickup.request.line.manager,model_laundry_pickup_request_line,laundry_management.group_laundry_manager,1,1,1,1
 access_service_type_manager,access.service.type.manager,model_service_type,laundry_management.group_laundry_manager,1,1,1,1
+access_laundry_contract_user,access.laundry.contract.user,model_laundry_contract,laundry_management.group_laundry_user,1,1,1,0
+access_laundry_contract_manager,access.laundry.contract.manager,model_laundry_contract,laundry_management.group_laundry_manager,1,1,1,1
+access_laundry_contract_public,access.laundry.contract.public,model_laundry_contract,base.group_public,1,1,1,0
+access_laundry_contract_portal,access.laundry.contract.portal,model_laundry_contract,base.group_portal,1,0,0,0

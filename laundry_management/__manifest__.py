@@ -8,7 +8,7 @@
                    'service',
     'author': 'Keval Vaja',
     'maintainer': 'Keval Vaja',
-    'depends': ['l10n_in', 'account', 'product','base'],
+    'depends': ['l10n_in', 'account', 'product','base', 'website', 'portal'],
 
     'data': [
         'security/laundry_management_security.xml',
@@ -19,6 +19,9 @@
         'views/service_type_views.xml',
         'views/account_move_view.xml',
         'views/laundry_pickup_request_views.xml',
+        'views/laundry_contract_views.xml',
+        'views/laundry_contract_website_templates.xml',
+        'views/laundry_contract_portal_templates.xml',
         'wizard/mail_compose_views.xml',
     ],
 

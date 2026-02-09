@@ -64,5 +64,24 @@
             <field name="groups" eval="[(4, ref('laundry_management.group_laundry_manager'))]"/>
         </record>
 
+        <!-- Record Rules for Laundry Contract -->
+        <record id="laundry_contract_public_rule" model="ir.rule">
+            <field name="name">Laundry Contract: Public Create</field>
+            <field name="model_id" ref="model_laundry_contract"/>
+            <field name="domain_force">[(1,'=',1)]</field>
+            <field name="groups" eval="[(4, ref('base.group_public'))]"/>
+            <field name="perm_read" eval="0"/>
+            <field name="perm_write" eval="0"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+
+        <record id="laundry_contract_portal_rule" model="ir.rule">
+            <field name="name">Laundry Contract: Portal Own Contracts</field>
+            <field name="model_id" ref="model_laundry_contract"/>
+            <field name="domain_force">[('partner_id', '=', user.partner_id.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        </record>
+
     </data>
 </odoo>

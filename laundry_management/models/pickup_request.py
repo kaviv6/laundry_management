@@ -87,23 +87,6 @@ class LaundryPickupRequest(models.Model):
         """
         self.ensure_one()
 
-        def _format_address(partner):
-            address_parts = [
-                partner.street or '',
-                partner.street2 or '',
-                partner.city or '',
-                (partner.state_id and partner.state_id.name) or '',
-                partner.zip or '',
-                (partner.country_id and partner.country_id.name) or '',
-            ]
-            # Keep only non-empty, trimmed parts
-            return ', '.join([p.strip() for p in address_parts if p and p.strip()])
-
-        destination = _format_address(self.partner_id)
-        # If no destination can be built, fallback to partner display name
-        if not destination:
-            destination = self.partner_id.display_name
-
         # Build the Google Maps Directions URL
         # doc: https://developers.google.com/maps/documentation/urls/get-started
         from urllib.parse import urlencode
@@ -111,8 +94,28 @@ class LaundryPickupRequest(models.Model):
         query_params = {
             'api': 1,
             'travelmode': 'driving',
-            'destination': destination,
         }
+
+        if self.partner_id.partner_latitude and self.partner_id.partner_longitude:
+            query_params['destination'] = f"{self.partner_id.partner_latitude},{self.partner_id.partner_longitude}"
+        else:
+            def _format_address(partner):
+                address_parts = [
+                    partner.street or '',
+                    partner.street2 or '',
+                    partner.city or '',
+                    (partner.state_id and partner.state_id.name) or '',
+                    partner.zip or '',
+                    (partner.country_id and partner.country_id.name) or '',
+                ]
+                # Keep only non-empty, trimmed parts
+                return ', '.join([p.strip() for p in address_parts if p and p.strip()])
+
+            destination = _format_address(self.partner_id)
+            # If no destination can be built, fallback to partner display name
+            if not destination:
+                destination = self.partner_id.display_name
+            query_params['destination'] = destination
 
         url = 'https://www.google.com/maps/dir/?' + urlencode(query_params)
 
@@ -157,5 +160,3 @@ class LaundryPickupRequestLine(models.Model):
     def _compute_amount(self):
         for line in self:
             line.amount = (line.price_unit or 0.0) * (line.qty or 0)
-
-

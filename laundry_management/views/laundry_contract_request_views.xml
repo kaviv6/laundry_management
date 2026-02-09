@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Form View -->
+        <record id="view_laundry_contract_request_form" model="ir.ui.view">
+            <field name="name">laundry.contract.request.form</field>
+            <field name="model">laundry.contract.request</field>
+            <field name="arch" type="xml">
+                <form string="Laundry Contract Request">
+                    <header>
+                        <button name="action_submit_request" string="Submit" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                        <button name="action_start_negotiation" string="Start Negotiation" type="object" class="oe_highlight" invisible="state != 'submitted'"/>
+                        <button name="%(mail.action_email_compose_message_wizard)d" string="Send Pricelist" type="action" class="oe_highlight" context="{'default_composition_mode': 'comment'}" invisible="state != 'in_negotiation'"/>
+                        <button name="action_convert_to_contract" string="Convert to Contract" type="object" class="oe_highlight" invisible="state != 'in_negotiation'"/>
+                        <button name="action_cancel" string="Cancel" type="object" invisible="state not in ('draft', 'submitted', 'in_negotiation')"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,submitted,in_negotiation,converted"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_title">
+                            <h1>
+                                <field name="name" readonly="1"/>
+                            </h1>
+                        </div>
+                        <group>
+                            <group>
+                                <field name="partner_id"/>
+                                <field name="contact_name"/>
+                                <field name="email_from"/>
+                                <field name="phone"/>
+                            </group>
+                            <group>
+                                <field name="company_type"/>
+                                <field name="pricelist_id"/>
+                                <field name="collection_time" widget="float_time"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Description">
+                                <field name="description"/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <div class="oe_chatter">
+                        <field name="message_follower_ids"/>
+                        <field name="activity_ids"/>
+                        <field name="message_ids"/>
+                    </div>
+                </form>
+            </field>
+        </record>
+
+        <!-- Tree View -->
+        <record id="view_laundry_contract_request_tree" model="ir.ui.view">
+            <field name="name">laundry.contract.request.tree</field>
+            <field name="model">laundry.contract.request</field>
+            <field name="arch" type="xml">
+                <list string="Laundry Contract Requests">
+                    <field name="name"/>
+                    <field name="partner_id"/>
+                    <field name="company_type"/>
+                    <field name="state"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- Action -->
+        <record id="action_laundry_contract_request" model="ir.actions.act_window">
+            <field name="name">Contract Requests</field>
+            <field name="res_model">laundry.contract.request</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+        <!-- Menu -->
+        <menuitem id="menu_laundry_contract_request" name="Contract Requests" parent="laundry_management.laundry_management_menu" action="action_laundry_contract_request" sequence="20"/>
+    </data>
+</odoo>
