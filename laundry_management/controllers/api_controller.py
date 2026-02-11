@@ -6,44 +6,49 @@ class LaundryAPIController(http.Controller):
     # -----------------------------------------------------
     # LOGIN ENDPOINT (already working)
     # -----------------------------------------------------
-    @http.route('/api/login', type='jsonrpc', auth='none', methods=['POST'], csrf=False)
+    @http.route('/api/login', type='json', auth='none', methods=['POST'], csrf=False)
     def api_login(self, **kwargs):
-        params = kwargs.get('params') if isinstance(kwargs.get('params'), dict) else kwargs
-        db = params.get('db')
-        username = params.get('username')
-        password = params.get('password')
+
+        db = kwargs.get('db')
+        username = kwargs.get('username')
+        password = kwargs.get('password')
 
         if not db or not username or not password:
-            return {"status": False, "error": "Missing db, username, or password"}
-
-        credential = {"type": "password", "login": username, "password": password}
-        user_agent_env = {
-            "base_location": request.httprequest.host_url,
-            "HTTP_USER_AGENT": request.httprequest.environ.get("HTTP_USER_AGENT"),
-        }
+            return {"status": False, "error": "Missing credentials"}
 
         try:
-            auth_info = request.env["res.users"].authenticate(credential, user_agent_env)
-            if auth_info and auth_info.get("uid"):
-                uid = auth_info["uid"]
-                user = request.env["res.users"].sudo().browse(uid)
-                request.session.uid = uid
-                request.session.db = db
-                return {
-                    "status": True,
-                    "uid": uid,
-                    "name": user.name,
-                    "session_id": request.session.sid,
-                }
-            else:
+            request.session.db = db
+
+            credential = {
+                "type": "password",
+                "login": username,
+                "password": password,
+            }
+
+            # THIS IS THE CORRECT CALL IN ODOO 19
+            auth_info = request.session.authenticate(request.env, credential)
+
+            if not auth_info or not auth_info.get("uid"):
                 return {"status": False, "error": "Invalid credentials"}
+
+            uid = auth_info["uid"]
+            user = request.env['res.users'].sudo().browse(uid)
+            print("UID:", request.session.uid)
+            print("TOKEN:", request.session.session_token)
+            return {
+                "status": True,
+                "uid": uid,
+                "name": user.name,
+                "session_id": request.session.sid,
+            }
+
         except Exception as e:
             return {"status": False, "error": str(e)}
 
     # -----------------------------------------------------
     # 1️⃣ LIST LAUNDRY ORDERS
     # -----------------------------------------------------
-    @http.route('/api/laundry/orders', type='jsonrpc', auth='user', methods=['GET'], csrf=False)
+    @http.route('/api/laundry/orders', type='json', auth='user', methods=['POST'], csrf=False)
     def get_orders(self, **kwargs):
         """
         List all laundry orders visible to the current user.
@@ -61,7 +66,7 @@ class LaundryAPIController(http.Controller):
             "name": o.name,
             "customer": o.partner_id.name,
             "status": o.state,
-            "amount_total": o.amount_total,
+            "amount_total": o.total_amount,
             "date": o.create_date.strftime("%Y-%m-%d %H:%M:%S")
         } for o in orders]
 
