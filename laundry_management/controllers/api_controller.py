@@ -183,16 +183,15 @@ class LaundryAPIController(http.Controller):
     # 5️⃣ SIGNUP ENDPOINT
     # -----------------------------------------------------
     @http.route('/api/signup', type='json', auth='public', methods=['POST'], csrf=False)
-    def signup(self, **params):
+    def signup(self, **kwargs):
         try:
+            params = kwargs.get('params') if isinstance(kwargs.get('params'), dict) else kwargs
+            
             name = params.get('name')
             email = params.get('login')
             password = params.get('password')
             mobile = params.get('mobile')
-            address = params.get('address')
-            latitude = params.get('latitude')
-            longitude = params.get('longitude')
-
+            
             if not all([name, email, password]):
                 return {'error': 'Missing required fields (name, email, password)'}
 
@@ -202,18 +201,18 @@ class LaundryAPIController(http.Controller):
             if existing_user:
                 return {'error': 'User with this email already exists'}
 
-            # Create user
+            # Prepare values for User creation (inherits Partner fields)
+            portal_group_id = request.env.ref('base.group_portal').id
+            
             values = {
                 'name': name,
                 'login': email,
                 'password': password,
                 'email': email,
-            }
-            new_user = User.create(values)
-
-            # Update partner details
-            partner_vals = {
-                'mobile': mobile,
+                'group_ids': [(6, 0, [portal_group_id])], # Correct field name for Odoo 19
+                
+                # Partner Details (Delegated to res.partner)
+                'phone': mobile,
                 'street': params.get('street'),
                 'street2': params.get('street2'),
                 'city': params.get('city'),
@@ -225,31 +224,35 @@ class LaundryAPIController(http.Controller):
             if state_name:
                 state = request.env['res.country.state'].sudo().search([('name', '=ilike', state_name)], limit=1)
                 if state:
-                    partner_vals['state_id'] = state.id
+                    values['state_id'] = state.id
 
             # Handle Country
             country_name = params.get('country')
             if country_name:
                 country = request.env['res.country'].sudo().search([('name', '=ilike', country_name)], limit=1)
                 if country:
-                    partner_vals['country_id'] = country.id
+                    values['country_id'] = country.id
             
+            # Handle Coordinates
+            latitude = params.get('latitude')
+            longitude = params.get('longitude')
             if latitude and longitude:
-                partner_vals.update({
+                values.update({
                     'partner_latitude': float(latitude),
                     'partner_longitude': float(longitude),
                     'date_localization': fields.Date.today(),
                 })
 
-            new_user.partner_id.write(partner_vals)
-
-            # Add to Portal group
-            portal_group = http.request.env.ref('base.group_portal')
-            if portal_group:
-                portal_group.write({'users': [(4, new_user.id)]})
+            # Create User (and Partner implicitly)
+            new_user = User.create(values)
 
             # Authenticate to generate session
-            http.request.session.authenticate(http.request.db, email, password)
+            credential = {
+                "type": "password",
+                "login": email,
+                "password": password,
+            }
+            request.session.authenticate(request.env, credential)
             session_id = http.request.session.sid
 
             return {
