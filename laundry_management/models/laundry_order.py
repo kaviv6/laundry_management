@@ -7,7 +7,7 @@ _logger = logging.getLogger(__name__)
 class LaundryOrder(models.Model):
     """laundry orders generating model"""
     _name = 'laundry.order'
-    _inherit = 'mail.thread'
+    _inherit = ['mail.thread', 'portal.mixin']
     _description = "Laundry Order"
     _order = 'order_date desc, id desc'
 
@@ -213,6 +213,11 @@ class LaundryOrder(models.Model):
                 _logger.error("Error processing laundry order %s: %s", order.name, e)
         return True
 
+
+    def _compute_access_url(self):
+        super(LaundryOrder, self)._compute_access_url()
+        for order in self:
+            order.access_url = '/my/laundry/orders'
 
 class LaundryOrderLine(models.Model):
     """Laundry order lines generating model"""

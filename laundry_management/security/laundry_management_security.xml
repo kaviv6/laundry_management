@@ -83,5 +83,12 @@
             <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
         </record>
 
+        <record id="laundry_order_portal_rule" model="ir.rule">
+            <field name="name">Laundry Order: Portal Own Orders</field>
+            <field name="model_id" ref="model_laundry_order"/>
+            <field name="domain_force">[('partner_id', '=', user.partner_id.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        </record>
+
     </data>
 </odoo>

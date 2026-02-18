@@ -11,6 +11,11 @@ class LaundryCustomerPortal(CustomerPortal):
             values['contract_count'] = request.env['laundry.contract'].search_count([
                 ('partner_id', '=', partner.id)
             ])
+        if 'laundry_order_count' in counters:
+             partner = request.env.user.partner_id
+             values['laundry_order_count'] = request.env['laundry.order'].search_count([
+                 ('partner_id', '=', partner.id)
+             ])
         return values
 
     @http.route(['/my/contracts', '/my/contracts/page/<int:page>'], type='http', auth="user", website=True)
@@ -38,3 +43,29 @@ class LaundryCustomerPortal(CustomerPortal):
             'default_url': '/my/contracts',
         })
         return request.render("laundry_management.portal_my_contracts", values)
+
+    @http.route(['/my/laundry/orders', '/my/laundry/orders/page/<int:page>'], type='http', auth="user", website=True)
+    def portal_my_laundry_orders(self, page=1, date_begin=None, date_end=None, sortby=None, **kw):
+        values = self._prepare_portal_layout_values()
+        partner = request.env.user.partner_id
+        LaundryOrder = request.env['laundry.order']
+
+        domain = [('partner_id', '=', partner.id)]
+
+        laundry_order_count = LaundryOrder.search_count(domain)
+        pager = portal_pager(
+            url="/my/laundry/orders",
+            url_args={'date_begin': date_begin, 'date_end': date_end, 'sortby': sortby},
+            total=laundry_order_count,
+            page=page,
+            step=self._items_per_page
+        )
+
+        laundry_orders = LaundryOrder.search(domain, limit=self._items_per_page, offset=pager['offset'])
+        values.update({
+            'laundry_orders': laundry_orders,
+            'page_name': 'laundry_order',
+            'pager': pager,
+            'default_url': '/my/laundry/orders',
+        })
+        return request.render("laundry_management.portal_my_laundry_orders", values)

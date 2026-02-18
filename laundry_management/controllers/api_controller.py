@@ -1,4 +1,4 @@
-from odoo import http
+from odoo import http, fields
 from odoo.http import request
 
 class LaundryAPIController(http.Controller):
@@ -148,9 +148,15 @@ class LaundryAPIController(http.Controller):
     # -----------------------------------------------------
     # 4️⃣ GET SINGLE ORDER DETAILS
     # -----------------------------------------------------
-    @http.route('/api/laundry/order/<int:order_id>', type='jsonrpc', auth='user', methods=['GET'], csrf=False)
-    def get_order_detail(self, order_id, **kwargs):
-        order = request.env['laundry.order'].sudo().browse(order_id)
+    @http.route('/api/laundry/order/details', type='json', auth='user', methods=['POST'], csrf=False)
+    def get_order_detail(self, **kwargs):
+        params = kwargs.get('params') if isinstance(kwargs.get('params'), dict) else kwargs
+        order_id = params.get('order_id')
+        
+        if not order_id:
+            return {"status": False, "error": "Order ID required"}
+
+        order = request.env['laundry.order'].sudo().browse(int(order_id))
         if not order.exists():
             return {"status": False, "error": "Order not found"}
 
@@ -161,8 +167,98 @@ class LaundryAPIController(http.Controller):
                 "name": order.name,
                 "customer": order.partner_id.name,
                 "status": order.state,
-                "amount_total": order.amount_total,
-                "services": [s.name for s in order.service_ids],
-                "date": order.create_date.strftime("%Y-%m-%d %H:%M:%S")
+                "amount_total": order.total_amount,
+                "date": order.create_date.strftime("%Y-%m-%d %H:%M:%S"),
+                "lines": [{
+                    "product": line.product_id.name,
+                    "quantity": line.qty,
+                    "price_unit": line.price_unit,
+                    "subtotal": line.amount,
+                    "description": line.description or ""
+                } for line in order.order_line_ids]
             }
         }
+
+    # -----------------------------------------------------
+    # 5️⃣ SIGNUP ENDPOINT
+    # -----------------------------------------------------
+    @http.route('/api/signup', type='json', auth='public', methods=['POST'], csrf=False)
+    def signup(self, **params):
+        try:
+            name = params.get('name')
+            email = params.get('login')
+            password = params.get('password')
+            mobile = params.get('mobile')
+            address = params.get('address')
+            latitude = params.get('latitude')
+            longitude = params.get('longitude')
+
+            if not all([name, email, password]):
+                return {'error': 'Missing required fields (name, email, password)'}
+
+            # Check if user exists
+            User = http.request.env['res.users'].sudo()
+            existing_user = User.search([('login', '=', email)], limit=1)
+            if existing_user:
+                return {'error': 'User with this email already exists'}
+
+            # Create user
+            values = {
+                'name': name,
+                'login': email,
+                'password': password,
+                'email': email,
+            }
+            new_user = User.create(values)
+
+            # Update partner details
+            partner_vals = {
+                'mobile': mobile,
+                'street': params.get('street'),
+                'street2': params.get('street2'),
+                'city': params.get('city'),
+                'zip': params.get('zip'),
+            }
+
+            # Handle State
+            state_name = params.get('state')
+            if state_name:
+                state = request.env['res.country.state'].sudo().search([('name', '=ilike', state_name)], limit=1)
+                if state:
+                    partner_vals['state_id'] = state.id
+
+            # Handle Country
+            country_name = params.get('country')
+            if country_name:
+                country = request.env['res.country'].sudo().search([('name', '=ilike', country_name)], limit=1)
+                if country:
+                    partner_vals['country_id'] = country.id
+            
+            if latitude and longitude:
+                partner_vals.update({
+                    'partner_latitude': float(latitude),
+                    'partner_longitude': float(longitude),
+                    'date_localization': fields.Date.today(),
+                })
+
+            new_user.partner_id.write(partner_vals)
+
+            # Add to Portal group
+            portal_group = http.request.env.ref('base.group_portal')
+            if portal_group:
+                portal_group.write({'users': [(4, new_user.id)]})
+
+            # Authenticate to generate session
+            http.request.session.authenticate(http.request.db, email, password)
+            session_id = http.request.session.sid
+
+            return {
+                'status': 'success',
+                'user_id': new_user.id,
+                'session_id': session_id,
+                'name': new_user.name,
+                'email': new_user.login,
+            }
+
+        except Exception as e:
+            return {'error': str(e)}
