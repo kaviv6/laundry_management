@@ -9,11 +9,14 @@
                 <header>
                     <button name="close_order" class="oe_highlight"
                             string="Close Order" type="object"
-                            invisible="pickup_request_ids or state not in 'draft'"/>
+                            invisible="pickup_request_ids or state not in 'draft'"
+                            groups="laundry_management.group_laundry_user,laundry_management.group_laundry_manager"/>
                     <button name="action_create_invoice" class="oe_highlight"
-                            string="Create Invoice" type="object" invisible="pickup_request_ids or state != 'order'"/>
+                            string="Create Invoice" type="object" invisible="pickup_request_ids or state != 'order'"
+                            groups="laundry_management.group_laundry_manager"/>
                     <button name="action_cancel_order" string="Cancel"
-                            type="object" invisible="pickup_request_ids or state not in 'draft'"/>
+                            type="object" invisible="pickup_request_ids or state not in 'draft'"
+                            groups="laundry_management.group_laundry_user,laundry_management.group_laundry_manager"/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="draft,order"/>
                 </header>
@@ -22,7 +25,8 @@
                         <button name='action_view_invoice'
                                 class="oe_stat_button" type="object"
                                 icon="fa-money"
-                                invisible="state not in ('invoiced')">
+                                invisible="state not in ('invoiced')"
+                                groups="laundry_management.group_laundry_manager">
                             <field string="Invoice" name="invoice_count"
                                    widget="statinfo"/>
                         </button>
@@ -48,7 +52,8 @@
                             <field name="currency_id"
                                    readonly="state != 'draft'"/>
                             <field name="laundry_person_id"
-                                   readonly="state in ['return', 'cancel']"/>
+                                   readonly="state in ['return', 'cancel']" groups="laundry_management.group_laundry_manager"/>
+                            <field name="rider_id" groups="laundry_management.group_laundry_manager"/>
                         </group>
                     </group>
                     <notebook>
@@ -88,7 +93,7 @@
                 <field name="name"/>
                 <field name="partner_id"/>
                 <field name="order_date"/>
-                <field name="laundry_person_id"/>
+                <field name="laundry_person_id" groups="laundry_management.group_laundry_manager"/>
                 <field name="total_amount"/>
                 <field name="state"/>
             </list>
@@ -114,5 +119,6 @@
               parent="laundry_management.laundry_management_menu" sequence="1"/>
     <menuitem id="laundry_management_menu_order" name="Laundry Order"
               parent="laundry_management.laundry_management_sub_menu"
-              action="laundry_order_action" sequence="1"/>
+              action="laundry_order_action" sequence="1"
+              groups="laundry_management.group_laundry_user,laundry_management.group_laundry_manager"/>
 </odoo>

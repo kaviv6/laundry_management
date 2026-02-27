@@ -47,5 +47,6 @@
               name="Contracts"
               parent="laundry_management.laundry_management_sub_menu"
               action="action_laundry_contract"
-              sequence="20"/>
+              sequence="20"
+              groups="laundry_management.group_laundry_user,laundry_management.group_laundry_manager"/>
 </odoo>

@@ -7,7 +7,7 @@ _logger = logging.getLogger(__name__)
 class LaundryOrder(models.Model):
     """laundry orders generating model"""
     _name = 'laundry.order'
-    _inherit = ['mail.thread', 'portal.mixin']
+    _inherit = ['mail.thread']
     _description = "Laundry Order"
     _order = 'order_date desc, id desc'
 
@@ -27,6 +27,9 @@ class LaundryOrder(models.Model):
     laundry_person_id = fields.Many2one('res.users', string='Laundry Person',
                                         required=True,
                                         help="Name of laundry person", default=lambda self: self.env.user)
+    rider_id = fields.Many2one('res.users', string='Rider',
+                               help="Rider who picked up and delivered the order",
+                               domain="[('employee_ids.is_rider', '=', True)]")
     order_line_ids = fields.One2many('laundry.order.line', 'laundry_id',
                                      required=True, ondelete='cascade',
                                      help="Order lines of laundry orders")
@@ -68,7 +71,8 @@ class LaundryOrder(models.Model):
         self.state = 'order'
 
     def action_create_invoice(self):
-        """Creating a new invoice for the laundry orders."""
+        """Creating a new invoice for the laundry orders.
+        Called by Admin from UI button — respects normal security."""
         invoice = self.env['account.move'].create({
             'partner_id': self.partner_id.id,
             'move_type': 'out_invoice',
@@ -158,25 +162,49 @@ class LaundryOrder(models.Model):
     def process_close_invoice_and_email(self):
         """Close the order, create and post invoice, email PDF to customer.
 
-        This reuses the same logic the cron uses but for a single order.
+        This is a system-triggered flow (called from Rider's Deliver button
+        or the monthly cron). Uses sudo() ONLY here because:
+        - Rider doesn't have accounting permissions
+        - This is a controlled internal method, not a UI-callable action
+        - The entry point (action_deliver) already validates Rider's access
+          to the pickup request via normal ACLs and record rules
         """
         self.ensure_one()
 
-        # Close order
+        # Close order (no sudo — Rider has write ACL on laundry.order)
         self.close_order()
 
-        # Create and post invoice
-        invoice = self.action_create_invoice()
+        # Create and post invoice (sudo — accounting permissions needed)
+        invoice = self.env['account.move'].sudo().create({
+            'partner_id': self.partner_id.id,
+            'move_type': 'out_invoice',
+            'invoice_date': fields.Date.today(),
+            'invoice_origin': self.name,
+        })
+
+        product = self.env.ref('laundry_management.product_product_laundry_service')
+
+        for line in self.order_line_ids:
+            self.env['account.move.line'].sudo().create({
+                'move_id': invoice.id,
+                'product_id': product.id,
+                'quantity': line.qty,
+                'price_unit': line.price_unit,
+            })
+
+        invoice.sudo().action_post()
+        self.state = "invoiced"
+
         if not invoice:
             return False
 
-        # Generate invoice PDF
-        pdf, _ = self.env['ir.actions.report']._render_qweb_pdf(
+        # Generate invoice PDF and email (sudo — report/attachment permissions)
+        pdf, _ = self.env['ir.actions.report'].sudo()._render_qweb_pdf(
             'account.account_invoices', invoice.id
         )
         pdf_name = f"{invoice.name or 'Invoice'}.pdf"
 
-        attachment = self.env['ir.attachment'].create({
+        attachment = self.env['ir.attachment'].sudo().create({
             'name': pdf_name,
             'type': 'binary',
             'datas': base64.b64encode(pdf),
@@ -189,7 +217,7 @@ class LaundryOrder(models.Model):
         template = self.env.ref('account.email_template_edi_invoice', raise_if_not_found=False)
         partner_email = self.partner_id.email
         if template and partner_email:
-            template.send_mail(invoice.id, force_send=True, email_values={
+            template.sudo().send_mail(invoice.id, force_send=True, email_values={
                 'email_to': partner_email,
                 'attachment_ids': [attachment.id],
             })
@@ -214,10 +242,6 @@ class LaundryOrder(models.Model):
         return True
 
 
-    def _compute_access_url(self):
-        super(LaundryOrder, self)._compute_access_url()
-        for order in self:
-            order.access_url = '/my/laundry/orders'
 
 class LaundryOrderLine(models.Model):
     """Laundry order lines generating model"""

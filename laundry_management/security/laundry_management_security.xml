@@ -15,79 +15,116 @@
             <field name="sequence">25</field>
         </record>
 
+        <!-- ============================================================ -->
+        <!-- SECURITY GROUPS (3 independent roles)                        -->
+        <!-- ============================================================ -->
+
         <!-- User Group - Basic access to laundry features -->
         <record id="group_laundry_user" model="res.groups">
             <field name="name">User</field>
             <field name="sequence">10</field>
             <field name="privilege_id" ref="res_groups_privilege_laundry_management"/>
             <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
-            <field name="comment">Basic access to laundry management features. Can create and manage their own laundry orders.</field>
+            <field name="comment">Basic access to laundry management. Can create/manage own orders, pickup requests, and contracts.</field>
         </record>
 
-        <!-- Manager Group - Full access to all laundry features -->
+        <!-- Rider Group - Independent role for delivery riders -->
+        <record id="group_laundry_rider" model="res.groups">
+            <field name="name">Rider</field>
+            <field name="sequence">15</field>
+            <field name="privilege_id" ref="res_groups_privilege_laundry_management"/>
+            <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+            <field name="comment">Rider role. Can only view and update assigned pickup requests.</field>
+        </record>
+
+        <!-- Manager/Admin Group - Full access to all laundry features -->
         <record id="group_laundry_manager" model="res.groups">
             <field name="name">Administrator</field>
             <field name="sequence">20</field>
             <field name="privilege_id" ref="res_groups_privilege_laundry_management"/>
             <field name="implied_ids" eval="[(4, ref('laundry_management.group_laundry_user'))]"/>
             <field name="user_ids" eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"/>
-            <field name="comment">Full access to all laundry management features including configuration and all orders.</field>
+            <field name="comment">Full access to all laundry management features including configuration, all orders, and all records.</field>
         </record>
 
-        <!-- Record Rules for Laundry Orders -->
+        <!-- ============================================================ -->
+        <!-- RECORD RULES                                                 -->
+        <!-- ============================================================ -->
+
+        <!-- === Laundry Order Rules === -->
         <record id="laundry_order_user_rule" model="ir.rule">
             <field name="name">Laundry User: Own orders only</field>
             <field name="model_id" ref="model_laundry_order"/>
-            <field name="domain_force">[('create_uid', '=', user.id)]</field>
+            <field name="domain_force">['|', ('create_uid', '=', user.id), ('partner_id', '=', user.partner_id.id)]</field>
             <field name="groups" eval="[(4, ref('laundry_management.group_laundry_user'))]"/>
         </record>
 
         <record id="laundry_order_manager_rule" model="ir.rule">
-            <field name="name">Laundry Manager: Full access</field>
+            <field name="name">Laundry Admin: All orders</field>
             <field name="model_id" ref="model_laundry_order"/>
             <field name="domain_force">[(1,'=',1)]</field>
             <field name="groups" eval="[(4, ref('laundry_management.group_laundry_manager'))]"/>
         </record>
 
-        <!-- Record Rules for Laundry Pickup Requests -->
-        <record id="laundry_pickup_request_user_rule" model="ir.rule">
-            <field name="name">Laundry User: Own pickup requests only</field>
-            <field name="model_id" ref="model_laundry_pickup_request"/>
-            <field name="domain_force">[('create_uid', '=', user.id)]</field>
-            <field name="groups" eval="[(4, ref('laundry_management.group_laundry_user'))]"/>
-        </record>
-
-        <record id="laundry_pickup_request_manager_rule" model="ir.rule">
-            <field name="name">Laundry Manager: All pickup requests</field>
-            <field name="model_id" ref="model_laundry_pickup_request"/>
-            <field name="domain_force">[(1,'=',1)]</field>
-            <field name="groups" eval="[(4, ref('laundry_management.group_laundry_manager'))]"/>
-        </record>
-
-        <!-- Record Rules for Laundry Contract -->
-        <record id="laundry_contract_public_rule" model="ir.rule">
-            <field name="name">Laundry Contract: Public Create</field>
-            <field name="model_id" ref="model_laundry_contract"/>
-            <field name="domain_force">[(1,'=',1)]</field>
-            <field name="groups" eval="[(4, ref('base.group_public'))]"/>
-            <field name="perm_read" eval="0"/>
-            <field name="perm_write" eval="0"/>
+        <!-- Rider: can create orders (from pickup flow) — create-only, no domain filter -->
+        <record id="laundry_order_rider_create_rule" model="ir.rule">
+            <field name="name">Laundry Rider: Can create orders</field>
+            <field name="model_id" ref="model_laundry_order"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('laundry_management.group_laundry_rider'))]"/>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
             <field name="perm_create" eval="1"/>
             <field name="perm_unlink" eval="0"/>
         </record>
 
-        <record id="laundry_contract_portal_rule" model="ir.rule">
-            <field name="name">Laundry Contract: Portal Own Contracts</field>
-            <field name="model_id" ref="model_laundry_contract"/>
-            <field name="domain_force">[('partner_id', '=', user.partner_id.id)]</field>
-            <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        <!-- Rider: can read/write orders where they are the rider or laundry person -->
+        <record id="laundry_order_rider_rule" model="ir.rule">
+            <field name="name">Laundry Rider: Own orders (read/write)</field>
+            <field name="model_id" ref="model_laundry_order"/>
+            <field name="domain_force">['|', ('rider_id', '=', user.id), ('laundry_person_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('laundry_management.group_laundry_rider'))]"/>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="0"/>
         </record>
 
-        <record id="laundry_order_portal_rule" model="ir.rule">
-            <field name="name">Laundry Order: Portal Own Orders</field>
-            <field name="model_id" ref="model_laundry_order"/>
-            <field name="domain_force">[('partner_id', '=', user.partner_id.id)]</field>
-            <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        <!-- === Laundry Pickup Request Rules === -->
+        <record id="laundry_pickup_request_user_rule" model="ir.rule">
+            <field name="name">Laundry User: Own pickup requests</field>
+            <field name="model_id" ref="model_laundry_pickup_request"/>
+            <field name="domain_force">['|', ('create_uid', '=', user.id), ('laundry_person_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('laundry_management.group_laundry_user'))]"/>
+        </record>
+
+        <record id="laundry_pickup_request_rider_rule" model="ir.rule">
+            <field name="name">Laundry Rider: Assigned pickup requests only</field>
+            <field name="model_id" ref="model_laundry_pickup_request"/>
+            <field name="domain_force">[('laundry_person_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('laundry_management.group_laundry_rider'))]"/>
+        </record>
+
+        <record id="laundry_pickup_request_manager_rule" model="ir.rule">
+            <field name="name">Laundry Admin: All pickup requests</field>
+            <field name="model_id" ref="model_laundry_pickup_request"/>
+            <field name="domain_force">[(1,'=',1)]</field>
+            <field name="groups" eval="[(4, ref('laundry_management.group_laundry_manager'))]"/>
+        </record>
+
+        <!-- === Laundry Contract Rules === -->
+        <record id="laundry_contract_user_rule" model="ir.rule">
+            <field name="name">Laundry User: Own contracts only</field>
+            <field name="model_id" ref="model_laundry_contract"/>
+            <field name="domain_force">[('create_uid', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('laundry_management.group_laundry_user'))]"/>
+        </record>
+
+        <record id="laundry_contract_manager_rule" model="ir.rule">
+            <field name="name">Laundry Admin: All contracts</field>
+            <field name="model_id" ref="model_laundry_contract"/>
+            <field name="domain_force">[(1,'=',1)]</field>
+            <field name="groups" eval="[(4, ref('laundry_management.group_laundry_manager'))]"/>
         </record>
 
     </data>

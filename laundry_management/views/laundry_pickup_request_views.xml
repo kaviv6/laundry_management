@@ -6,21 +6,32 @@
         <field name="arch" type="xml">
             <form string="Laundry Pickup Request">
                 <header>
-                    <button name="action_schedule" type="object" string="Schedule" invisible="state != 'draft'" class="btn-primary"/>
-                    <button name="action_pickup" type="object" string="Pickup" invisible="state != 'scheduled'" class="btn-secondary"/>
-                    <button name="action_deliver" type="object" string="Deliver To Customer" invisible="state != 'picked'" class="btn-primary"/>
-                    <button name="action_cancel" type="object" string="Cancel" invisible="state in ['delivered', 'cancel']" class="btn-secondary"/>
+                    <button name="action_schedule" type="object" string="Schedule" invisible="state != 'draft'" class="btn-primary"
+                            groups="laundry_management.group_laundry_user,laundry_management.group_laundry_manager"/>
+                    <button name="action_pickup" type="object" string="Pickup" invisible="state != 'scheduled'" class="btn-secondary"
+                            groups="laundry_management.group_laundry_rider,laundry_management.group_laundry_manager"/>
+                    <button name="action_deliver" type="object" string="Deliver To Customer" invisible="state != 'picked'" class="btn-primary"
+                            groups="laundry_management.group_laundry_rider,laundry_management.group_laundry_manager"/>
+                    <button name="action_cancel" type="object" string="Cancel" invisible="state in ['delivered', 'cancel']" class="btn-secondary"
+                            groups="laundry_management.group_laundry_user,laundry_management.group_laundry_manager"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,scheduled,picked"/>
                 </header>
                 <sheet>
                     <div class="oe_button_box" name="button_box">
-                        <button type="object" name="action_open_map" class="oe_stat_button" icon="fa-map-marker" string="Map"/>
-                        <button type="object" name="action_view_order" class="oe_stat_button" icon="fa-external-link" string="Laundry Order" invisible="order_id  == False"/>
+                        <button type="object" name="action_open_map" class="oe_stat_button" icon="fa-map-marker" string="Map"
+                                groups="laundry_management.group_laundry_manager,laundry_management.group_laundry_rider"/>
+                        <button type="object" name="action_view_order" class="oe_stat_button" icon="fa-external-link" string="Laundry Order"
+                                invisible="order_id  == False"
+                                groups="laundry_management.group_laundry_user,laundry_management.group_laundry_manager"/>
                     </div>
                     <group>
                         <group>
                             <field name="name" readonly="1"/>
-                            <field name="partner_id" widget="res_partner_many2one" context="{'res_partner_search_mode': 'customer', 'show_address': 1, 'show_vat': True}" readonly="state != 'draft'"/>
+                            <field name="partner_id" widget="res_partner_many2one" context="{'res_partner_search_mode': 'customer', 'show_address': 1, 'show_vat': True}" readonly="state != 'draft'"
+                                   groups="laundry_management.group_laundry_user,laundry_management.group_laundry_manager"/>
+                            <!-- Rider sees customer name as readonly text -->
+                            <field name="partner_id" readonly="1" groups="laundry_management.group_laundry_rider"/>
+                            <field name="laundry_person_id" groups="laundry_management.group_laundry_manager"/>
                         </group>
                         <group>
                             <field name="schedule_date" readonly="state != 'draft'"/>
@@ -30,7 +41,7 @@
                         </group>
                     </group>
                     <notebook>
-                        <page string="Lines">
+                        <page string="Lines" groups="laundry_management.group_laundry_user,laundry_management.group_laundry_manager">
                             <field name="line_ids" readonly="state != 'draft'">
                                 <list editable="bottom">
                                     <field name="product_id"/>
@@ -41,8 +52,21 @@
                                 </list>
                             </field>
                         </page>
+                        <!-- Rider sees lines as readonly -->
+                        <page string="Lines" groups="laundry_management.group_laundry_rider">
+                            <field name="line_ids" readonly="1">
+                                <list>
+                                    <field name="product_id"/>
+                                    <field name="service_type_id"/>
+                                    <field name="qty"/>
+                                    <field name="price_unit"/>
+                                    <field name="amount"/>
+                                </list>
+                            </field>
+                        </page>
                     </notebook>
                 </sheet>
+                <chatter/>
             </form>
         </field>
     </record>
@@ -54,6 +78,7 @@
             <list>
                 <field name="name"/>
                 <field name="partner_id"/>
+                <field name="laundry_person_id" groups="laundry_management.group_laundry_manager"/>
                 <field name="schedule_date"/>
                 <field name="pickup_date"/>
                 <field name="total_amount"/>
@@ -68,10 +93,10 @@
         <field name="view_mode">list,form</field>
     </record>
 
+    <!-- Pickup Requests menu is visible to all 3 roles -->
     <menuitem id="laundry_pickup_request_menu"
               name="Pickup Requests"
               parent="laundry_management.laundry_management_sub_menu"
               action="laundry_pickup_request_action"
               sequence="40"/>
 </odoo>
-

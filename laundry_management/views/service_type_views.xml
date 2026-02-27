@@ -41,10 +41,12 @@
     </record>
     <!--    Defined Menus-->
     <menuitem id="laundry_config_menu" name="Configuration"
-              parent="laundry_management_menu" sequence="3"/>
+              parent="laundry_management_menu" sequence="3"
+              groups="laundry_management.group_laundry_manager"/>
     <menuitem id="laundry_customer" name="Customers"
-              parent="laundry_config_menu"
-              action="base.action_partner_customer_form" sequence="1"/>
+              parent="laundry_management.laundry_management_sub_menu"
+              action="base.action_partner_customer_form" sequence="2"
+              groups="laundry_management.group_laundry_manager"/>
     <menuitem id="laundry_products" name="Products"
               parent="laundry_config_menu"
               action="product.product_normal_action_sell" sequence="2"/>

@@ -9,6 +9,10 @@ class LaundryPickupRequest(models.Model):
 
     name = fields.Char(string='Request', copy=False, default=lambda self: _('New'))
     partner_id = fields.Many2one('res.partner', string='Customer', required=True, tracking=True)
+    laundry_person_id = fields.Many2one(
+        'res.users', string='Rider', tracking=True,
+        domain="[('employee_ids.is_rider', '=', True)]",
+    )
     street = fields.Char(related='partner_id.street', string='Street', store=True, readonly=True)
     street2 = fields.Char(related='partner_id.street2', string='Street2', store=True, readonly=True)
     city = fields.Char(related='partner_id.city', string='City', store=True, readonly=True)
@@ -51,6 +55,7 @@ class LaundryPickupRequest(models.Model):
     def action_deliver(self):
         for request in self:
             # If an order exists, close, invoice, and email using reusable method
+            # Use sudo() so Rider can trigger invoice/email operations
             if request.order_id:
                 request.order_id.process_close_invoice_and_email()
             request.write({'state': 'delivered'})
@@ -65,6 +70,7 @@ class LaundryPickupRequest(models.Model):
                 order_vals = {
                     'partner_id': request.partner_id.id,
                     'laundry_person_id': self.env.user.id,
+                    'rider_id': self.env.user.id,
                     'order_line_ids': [],
                 }
                 line_vals_list = []
