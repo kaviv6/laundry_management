@@ -31,7 +31,7 @@ class LaundryAPI(http.Controller):
     # --------------------------
     # 🔑 LOGIN
     # --------------------------
-    @http.route('/api/v1/login', type='json', auth='none', methods=['POST'], csrf=False)
+    @http.route('/api/v1/login', type='jsonrpc', auth='none', methods=['POST'], csrf=False)
     def login(self, **kwargs):
         login = kwargs.get('login')
         password = kwargs.get('password')
@@ -63,7 +63,7 @@ class LaundryAPI(http.Controller):
     # --------------------------
     # 👤 SIGNUP
     # --------------------------
-    @http.route('/api/v1/signup', type='json', auth='none', methods=['POST'], csrf=False)
+    @http.route('/api/v1/signup', type='jsonrpc', auth='none', methods=['POST'], csrf=False)
     def signup(self, **kwargs):
         name = kwargs.get('name')
         login = kwargs.get('login')
@@ -100,7 +100,7 @@ class LaundryAPI(http.Controller):
     # --------------------------
     # 📦 GET ORDERS
     # --------------------------
-    @http.route('/api/v1/orders', type='json', auth='none', methods=['POST'], csrf=False)
+    @http.route('/api/v1/orders', type='jsonrpc', auth='none', methods=['POST'], csrf=False)
     def get_orders(self, **kwargs):
         user, error = self._authenticate()
         if error:
@@ -132,7 +132,7 @@ class LaundryAPI(http.Controller):
     # --------------------------
     # 🔄 UPDATE ORDER STATUS
     # --------------------------
-    @http.route('/api/v1/order/update_status', type='json', auth='none', methods=['POST'], csrf=False)
+    @http.route('/api/v1/order/update_status', type='jsonrpc', auth='none', methods=['POST'], csrf=False)
     def update_order_status(self, **kwargs):
         user, error = self._authenticate()
         if error:
