@@ -1,43 +1,118 @@
 from odoo import http
 from odoo.http import request
+import secrets
 
 
 class LaundryAPI(http.Controller):
 
     # --------------------------
-    # 🔐 AUTH USING ODOO API KEY
+    # 🔐 AUTH USING TOKEN
     # --------------------------
     def _authenticate(self):
         auth_header = request.httprequest.headers.get('Authorization')
 
         if not auth_header:
-            return None, {"status": False, "message": "Missing Authorization header"}
+            return None, {"status": False, "message": "Token missing"}
 
         try:
-            # Expected format: "Basic login:api_key"
-            auth_type, credentials = auth_header.split(' ')
-            login, api_key = credentials.split(':')
+            token = auth_header.replace("Bearer ", "").strip()
         except Exception:
-            return None, {"status": False, "message": "Invalid Authorization format"}
+            return None, {"status": False, "message": "Invalid token format"}
 
-        uid = request.session.authenticate(request.db, login, api_key)
+        user = request.env['res.users'].sudo().search([
+            ('api_token', '=', token)
+        ], limit=1)
+
+        if not user:
+            return None, {"status": False, "message": "Invalid token"}
+
+        return user, None
+
+    # --------------------------
+    # 🔑 LOGIN
+    # --------------------------
+    @http.route('/api/v1/login', type='json', auth='none', methods=['POST'], csrf=False)
+    def login(self, **kwargs):
+        login = kwargs.get('login')
+        password = kwargs.get('password')
+
+        if not login or not password:
+            return {"status": False, "message": "Missing credentials"}
+
+        uid = request.session.authenticate(request.db, login, password)
 
         if not uid:
-            return None, {"status": False, "message": "Invalid credentials"}
+            return {"status": False, "message": "Invalid credentials"}
 
         user = request.env['res.users'].browse(uid)
-        return user, None
+
+        # Generate new token
+        token = secrets.token_hex(32)
+        user.sudo().write({'api_token': token})
+
+        return {
+            "status": True,
+            "message": "Login successful",
+            "data": {
+                "user_id": user.id,
+                "name": user.name,
+                "token": token
+            }
+        }
+
+    # --------------------------
+    # 👤 SIGNUP
+    # --------------------------
+    @http.route('/api/v1/signup', type='json', auth='none', methods=['POST'], csrf=False)
+    def signup(self, **kwargs):
+        name = kwargs.get('name')
+        login = kwargs.get('login')
+        password = kwargs.get('password')
+
+        if not all([name, login, password]):
+            return {"status": False, "message": "Missing fields"}
+
+        existing = request.env['res.users'].sudo().search([
+            ('login', '=', login)
+        ], limit=1)
+
+        if existing:
+            return {"status": False, "message": "User already exists"}
+
+        user = request.env['res.users'].sudo().create({
+            'name': name,
+            'login': login,
+            'password': password,
+        })
+
+        token = secrets.token_hex(32)
+        user.sudo().write({'api_token': token})
+
+        return {
+            "status": True,
+            "message": "User created",
+            "data": {
+                "user_id": user.id,
+                "token": token
+            }
+        }
 
     # --------------------------
     # 📦 GET ORDERS
     # --------------------------
-    @http.route('/api/v1/orders', type='json', auth='none', methods=['GET'], csrf=False)
+    @http.route('/api/v1/orders', type='json', auth='none', methods=['POST'], csrf=False)
     def get_orders(self, **kwargs):
         user, error = self._authenticate()
         if error:
             return error
 
-        orders = request.env['laundry.order'].with_user(user).search([])
+        domain = []
+
+        # Restrict customers to their own records
+        if not user.has_group('base.group_system'):
+            domain.append(('partner_id', '=', user.partner_id.id))
+
+        orders = request.env['laundry.order'].with_user(user).search(domain)
 
         data = []
         for order in orders:
