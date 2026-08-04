@@ -1,0 +1,99 @@
+<div class="container mt-4" style="font-size: 16px;">
+
+    <h2 class="oe_slogan mb-3" style="font-weight: bold;">Cashfree Payment Gateway Integration</h2>
+
+    <h4 class="mt-4 border-bottom pb-3" style="font-size: 24px;">Configuration on the Cashfree Dashboard</h4>
+
+    <h5 class="mt-3" style="font-size: 20px;">How to Access Credentials?</h5>
+    <p class="mb-1">
+        For your onboarding, we invite you to book an appointment using the link provided. During this session, our team
+        will guide you through the onboarding steps and assist with any setup or clarification you may need:
+        <br />
+        <a href="https://www.odoo.com/book/india-payment-provider" target="_blank">
+            <code>https://www.odoo.com/book/india-payment-provider</code>
+        </a>
+    </p>
+
+    <p class="mb-0">
+        Once logged in, check the account mode in the top bar of the dashboard.
+        Use the <strong>Test</strong> environment for sandbox testing and switch to <strong>Production</strong> when you
+        are ready to accept live payments.
+    </p>
+
+    <h5 class="mt-4" style="font-size: 20px;">Configure Webhook</h5>
+    <ol class="px-3">
+        <li>Log in to your <a href="https://merchant.cashfree.com/" target="_blank">Cashfree Merchant Dashboard</a>.
+        </li>
+        <li>Go to <kbd>Developers &#8594; Webhooks</kbd>.</li>
+        <li>
+            Under the <strong>Payment Gateway</strong> section, click <strong>Add Webhook Endpoint</strong>, then enter
+            your Odoo database URL followed by
+            <code>/payment/cashfree/webhook</code> as the webhook endpoint.
+            <br>
+            For example: <code>https://example.odoo.com/payment/cashfree/webhook</code>
+        </li>
+        <li>Select <strong>Version 2025-01-01</strong> (the latest version currently supported in Odoo).</li>
+        <li>Click on <strong>Test</strong>, then click on <strong>Continue</strong> to verify and save the webhook.</li>
+        <li>
+            Select the following events to be notified:
+            <ul style="list-style-type: '- ';">
+                <li>Success Payment</li>
+                <li>Failed Payment</li>
+                <li>Refund</li>
+                <li>User Dropped Payment</li>
+                <img src="screenshots/webhook-dashboard.png" class="img-responsive my-3"
+                    style="width: 100%; margin-left: auto; margin-right: auto;">
+            </ul>
+        </li>
+        <p>
+            Save the webhook configuration to allow Cashfree to send real-time transaction status updates to Odoo.
+        </p>
+    </ol>
+
+
+    <h4 class="mt-4 border-bottom pb-3" style="font-size: 24px;">Configuration on Odoo</h4>
+
+    <ol>
+        <li>Install the <strong>Cashfree Payment Gateway</strong> module from the Apps menu.</li>
+        <li>
+            Navigate to the Payment Providers menu in Odoo:
+            <ul>
+                <li>Accounting &#8227; Configuration &#8227; Payment Providers</li>
+                <li>Website &#8227; Configuration &#8227; Payment Providers</li>
+                <li>Sales &#8227; Configuration &#8227; Payment Providers</li>
+            </ul>
+            <img src="screenshots/payment-providers-odoo.png" class="img-responsive my-3"
+                style="width: 100%; margin-left: auto; margin-right: auto;">
+        </li>
+        <li>
+            Select the <strong>Cashfree</strong> provider and open the <strong>Credentials</strong> tab.
+            <ul>
+                <li>Enter your <strong>Client ID</strong> and <strong>Client Secret</strong>.</li>
+                <li>Set the environment to <strong>Test</strong> or <strong>Production</strong> based on your setup.
+                </li>
+            </ul>
+            <img src="screenshots/provider-setup.png" class="img-responsive my-3"
+                style="width: 100%; margin-left: auto; margin-right: auto;">
+        </li>
+        <li>Set the provider’s <strong>State</strong> to <strong>Enabled</strong> and save your configuration.</li>
+    </ol>
+
+    <p class="mt-3">
+        Once configured, the <strong>Cashfree payment methods</strong> (UPI, Cards, Net Banking, etc.)
+        will appear automatically on your Odoo website checkout page, based on the settings defined in your Cashfree
+        dashboard.
+    </p>
+
+    <img src="screenshots/provider-ecommerce.png" class="img-responsive my-3"
+        style="width: 100%; margin-left: auto; margin-right: auto;">
+
+    <h4 class="mt-4 border-bottom pb-3" style="font-size: 24px;">Support</h4>
+    <p>
+        For any queries or support needs, kindly schedule an appointment via the link below. This will allow our team to
+        address your concerns directly and provide the necessary guidance:
+        <br />
+        <a href="https://www.odoo.com/book/india-payment-provider" target="_blank">
+            <code>https://www.odoo.com/book/india-payment-provider</code>
+        </a>
+    </p>
+</div>

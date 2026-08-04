@@ -36,6 +36,7 @@
                         <group>
                             <field name="schedule_date" readonly="state != 'draft'"/>
                             <field name="pickup_date" readonly="1"/>
+                            <field name="payment_method" readonly="state != 'draft'"/>
                             <field name="currency_id" groups="base.group_no_one" readonly="state != 'draft'"/>
                             <field name="total_amount" readonly="1"/>
                         </group>

@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ============================================================
+         LAUNDRY ORDER — Graph (Revenue by Month)
+         ============================================================ -->
+    <record id="laundry_order_view_graph" model="ir.ui.view">
+        <field name="name">laundry.order.graph</field>
+        <field name="model">laundry.order</field>
+        <field name="arch" type="xml">
+            <graph string="Revenue Analysis" type="bar" stacked="1">
+                <field name="order_date" interval="month" type="row"/>
+                <field name="state" type="col"/>
+                <field name="total_amount" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         LAUNDRY ORDER — Pivot (Full Analysis)
+         ============================================================ -->
+    <record id="laundry_order_view_pivot" model="ir.ui.view">
+        <field name="name">laundry.order.pivot</field>
+        <field name="model">laundry.order</field>
+        <field name="arch" type="xml">
+            <pivot string="Laundry Analysis" display_quantity="1">
+                <field name="order_date" interval="month" type="row"/>
+                <field name="state" type="col"/>
+                <field name="total_amount" type="measure"/>
+                <field name="is_express" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         LAUNDRY PICKUP — Graph (Pickups by Rider + Month)
+         ============================================================ -->
+    <record id="laundry_pickup_view_graph" model="ir.ui.view">
+        <field name="name">laundry.pickup.request.graph</field>
+        <field name="model">laundry.pickup.request</field>
+        <field name="arch" type="xml">
+            <graph string="Pickup Analysis" type="bar">
+                <field name="schedule_date" interval="month" type="row"/>
+                <field name="laundry_person_id" type="col"/>
+                <field name="total_amount" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         Actions that include graph/pivot
+         ============================================================ -->
+    <record id="action_laundry_order_report" model="ir.actions.act_window">
+        <field name="name">Revenue Analysis</field>
+        <field name="res_model">laundry.order</field>
+        <field name="view_mode">graph,pivot,list</field>
+        <field name="domain">[]</field>
+        <field name="context">{'search_default_group_by_month': 1}</field>
+    </record>
+
+    <record id="action_laundry_pickup_report" model="ir.actions.act_window">
+        <field name="name">Rider Performance</field>
+        <field name="res_model">laundry.pickup.request</field>
+        <field name="view_mode">graph,pivot,list</field>
+    </record>
+
+    <!-- ============================================================
+         Reporting menu (Manager only)
+         ============================================================ -->
+    <menuitem id="menu_laundry_reporting"
+              name="Reporting"
+              parent="laundry_management.laundry_management_sub_menu"
+              sequence="90"
+              groups="laundry_management.group_laundry_manager"/>
+
+    <menuitem id="menu_laundry_revenue_report"
+              name="Revenue Analysis"
+              parent="laundry_management.menu_laundry_reporting"
+              action="action_laundry_order_report"
+              sequence="1"
+              groups="laundry_management.group_laundry_manager"/>
+
+    <menuitem id="menu_laundry_rider_report"
+              name="Rider Performance"
+              parent="laundry_management.menu_laundry_reporting"
+              action="action_laundry_pickup_report"
+              sequence="2"
+              groups="laundry_management.group_laundry_manager"/>
+
+</odoo>

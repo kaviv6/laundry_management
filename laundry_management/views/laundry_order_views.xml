@@ -8,75 +8,95 @@
             <form string="Laundry Order">
                 <header>
                     <button name="close_order" class="oe_highlight"
-                            string="Close Order" type="object"
-                            invisible="pickup_request_ids or state not in 'draft'"
+                            string="Confirm Order" type="object"
+                            invisible="pickup_request_ids or state not in ('draft',)"
                             groups="laundry_management.group_laundry_user,laundry_management.group_laundry_manager"/>
                     <button name="action_create_invoice" class="oe_highlight"
-                            string="Create Invoice" type="object" invisible="pickup_request_ids or state != 'order'"
+                            string="Create Invoice" type="object"
+                            invisible="pickup_request_ids or state != 'order'"
                             groups="laundry_management.group_laundry_manager"/>
                     <button name="action_cancel_order" string="Cancel"
-                            type="object" invisible="pickup_request_ids or state not in 'draft'"
+                            type="object"
+                            invisible="pickup_request_ids or state not in ('draft',)"
                             groups="laundry_management.group_laundry_user,laundry_management.group_laundry_manager"/>
                     <field name="state" widget="statusbar"
-                           statusbar_visible="draft,order"/>
+                           statusbar_visible="draft,order,invoiced"/>
                 </header>
                 <sheet>
                     <div class="oe_button_box" name="button_box">
-                        <button name='action_view_invoice'
+                        <button name="action_view_invoice"
                                 class="oe_stat_button" type="object"
                                 icon="fa-money"
-                                invisible="state not in ('invoiced')"
+                                invisible="state not in ('invoiced',)"
                                 groups="laundry_management.group_laundry_manager">
-                            <field string="Invoice" name="invoice_count"
-                                   widget="statinfo"/>
+                            <field string="Invoices" name="invoice_count" widget="statinfo"/>
                         </button>
-                        <button name='action_view_pickups'
+                        <button name="action_view_pickups"
                                 class="oe_stat_button" type="object"
-                                icon="fa-external-link"
-                                string="Pickup Requests"
-                                invisible="not pickup_request_ids"/>
+                                icon="fa-motorcycle"
+                                invisible="not pickup_request_ids">
+                            <span class="o_stat_text">Pickups</span>
+                        </button>
+                        <button name="action_view_garments"
+                                class="oe_stat_button" type="object"
+                                icon="fa-tags">
+                            <field string="Garments" name="garment_count" widget="statinfo"/>
+                        </button>
+                        <button class="oe_stat_button" icon="fa-star"
+                                invisible="customer_rating == 0">
+                            <div class="o_field_widget o_stat_info">
+                                <span class="o_stat_value">
+                                    <field name="customer_rating" digits="[2,1]"/>
+                                </span>
+                                <span class="o_stat_text">Rating</span>
+                            </div>
+                        </button>
                     </div>
                     <div class="oe_title">
-                        <h1>
-                            <field name="name" readonly="1"/>
-                        </h1>
+                        <h1><field name="name" readonly="1"/></h1>
                     </div>
                     <group>
                         <group>
-                            <field name="partner_id"
-                                   readonly="state not in 'draft'"/>
+                            <field name="partner_id" readonly="state not in ('draft',)"/>
+                            <field name="contract_id"
+                                   groups="laundry_management.group_laundry_manager"/>
+                            <field name="payment_method"/>
                         </group>
                         <group>
-                            <field name="order_date"
-                                   readonly="state != 'draft'"/>
-                            <field name="currency_id"
-                                   readonly="state != 'draft'"/>
+                            <field name="order_date" readonly="state != 'draft'"/>
+                            <field name="eta"/>
+                            <field name="currency_id" readonly="state != 'draft'" groups="laundry_management.group_laundry_manager"/>
                             <field name="laundry_person_id"
-                                   readonly="state in ['return', 'cancel']" groups="laundry_management.group_laundry_manager"/>
+                                   readonly="state in ('cancel',)"
+                                   groups="laundry_management.group_laundry_manager"/>
                             <field name="rider_id" groups="laundry_management.group_laundry_manager"/>
+                            <field name="is_express" widget="boolean_toggle"/>
                         </group>
                     </group>
                     <notebook>
                         <page string="Order Lines">
                             <field name="order_line_ids">
-                                <list string="Laundry Order Lines"
-                                      editable="bottom">
+                                <list string="Order Lines" editable="bottom">
                                     <field name="date" readonly="parent.state != 'draft'"/>
-                                    <field name="product_id"/>
-                                    <field name="description"/>
-                                    <field name="qty"/>
+                                    <field name="product_id" optional="hide"/>
                                     <field name="service_type_id"/>
-                                    <field name="amount"/>
+                                    <field name="description" optional="hide"/>
+                                    <field name="qty"/>
+                                    <field name="price_unit" readonly="1"/>
+                                    <field name="amount" readonly="1"/>
                                 </list>
                             </field>
-                            <group class="oe_subtotal_footer oe_right"
-                                   colspan="2" name="laundry_total">
-                                <field name="total_amount" widget='monetary'
+                            <group class="oe_subtotal_footer oe_right" colspan="2">
+                                <field name="promo_id" readonly="1"
+                                       invisible="not promo_id"/>
+                                <field name="promo_discount" widget="monetary"
+                                       options="{'currency_field': 'currency_id'}"
+                                       invisible="not promo_discount"
+                                       string="Discount"/>
+                                <field name="total_amount" widget="monetary"
                                        options="{'currency_field': 'currency_id'}"/>
                             </group>
-                            <field name="note" class="oe_inline"
-                                   placeholder="Setup default terms and conditions in your company settings."/>
-                            <div class="oe_clear"/>
+                            <field name="note" placeholder="Terms and conditions…"/>
                         </page>
                     </notebook>
                 </sheet>
@@ -84,40 +104,74 @@
             </form>
         </field>
     </record>
+
     <!-- Laundry order list view -->
     <record id="laundry_order_view_list" model="ir.ui.view">
         <field name="name">laundry.order.view.list</field>
         <field name="model">laundry.order</field>
         <field name="arch" type="xml">
-            <list>
+            <list decoration-success="state == 'invoiced'"
+                  decoration-warning="state == 'order'"
+                  decoration-muted="state == 'cancel'">
                 <field name="name"/>
                 <field name="partner_id"/>
                 <field name="order_date"/>
-                <field name="laundry_person_id" groups="laundry_management.group_laundry_manager"/>
-                <field name="total_amount"/>
-                <field name="state"/>
+                <field name="is_express" optional="hide"/>
+                <field name="eta" optional="show"/>
+                <field name="laundry_person_id" groups="laundry_management.group_laundry_manager" optional="hide"/>
+                <field name="total_amount" widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                <field name="customer_rating" optional="show" string="Rating"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'invoiced'"
+                       decoration-warning="state == 'order'"
+                       decoration-info="state == 'draft'"
+                       decoration-danger="state == 'cancel'"/>
             </list>
         </field>
     </record>
-    <!--    Action for Laundry Order-->
-    <record id="laundry_order_action" model="ir.actions.act_window">
-        <field name="name">Laundry Management</field>
-        <field name="type">ir.actions.act_window</field>
-        <field name="res_model">laundry.order</field>
-        <field name="view_mode">list,form</field>
-        <field name="domain">[]</field>
-        <field name="help" type="html">
-            <p class="oe_view_nocontent_create">
-                Click to create a New Order.
-            </p>
+
+    <!-- Laundry order search view -->
+    <record id="laundry_order_search_view" model="ir.ui.view">
+        <field name="name">laundry.order.search</field>
+        <field name="model">laundry.order</field>
+        <field name="arch" type="xml">
+            <search string="Laundry Orders">
+                <field name="name" string="Order Ref"/>
+                <field name="partner_id" string="Customer"/>
+                <separator/>
+                <filter name="draft"    string="Draft"     domain="[('state','=','draft')]"/>
+                <filter name="order"    string="Confirmed" domain="[('state','=','order')]"/>
+                <filter name="invoiced" string="Invoiced"  domain="[('state','=','invoiced')]"/>
+                <filter name="express"  string="Express"   domain="[('is_express','=',True)]"/>
+                <separator/>
+                <filter name="this_month" string="This Month"
+                        domain="[('order_date','&gt;=', (context_today() + relativedelta(day=1)).strftime('%Y-%m-%d'))]"/>
+                <group>
+                    <filter name="group_state"   string="Status"    context="{'group_by': 'state'}"/>
+                    <filter name="group_partner" string="Customer"  context="{'group_by': 'partner_id'}"/>
+                    <filter name="group_month"   string="Month"     context="{'group_by': 'order_date:month'}"/>
+                </group>
+            </search>
         </field>
     </record>
-    <!--    Defined Menus-->
+
+    <!-- Action -->
+    <record id="laundry_order_action" model="ir.actions.act_window">
+        <field name="name">Laundry Orders</field>
+        <field name="res_model">laundry.order</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="laundry_order_search_view"/>
+        <field name="help" type="html">
+            <p class="oe_view_nocontent_create">Click to create a new laundry order.</p>
+        </field>
+    </record>
+
+    <!-- Menus -->
     <menuitem id="laundry_management_menu" name="Laundry Management"
               web_icon="laundry_management,static/description/icon.png"/>
     <menuitem id="laundry_management_sub_menu" name="Laundry Management"
               parent="laundry_management.laundry_management_menu" sequence="1"/>
-    <menuitem id="laundry_management_menu_order" name="Laundry Order"
+    <menuitem id="laundry_management_menu_order" name="Laundry Orders"
               parent="laundry_management.laundry_management_sub_menu"
               action="laundry_order_action" sequence="1"
               groups="laundry_management.group_laundry_user,laundry_management.group_laundry_manager"/>

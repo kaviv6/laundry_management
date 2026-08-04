@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Form View -->
+        <record id="view_laundry_pricelist_form" model="ir.ui.view">
+            <field name="name">laundry.pricelist.form</field>
+            <field name="model">laundry.pricelist</field>
+            <field name="arch" type="xml">
+                <form string="Pricelist">
+                    <sheet>
+                        <div class="oe_title">
+                            <h1>
+                                <field name="name" placeholder="Pricelist Name"/>
+                            </h1>
+                        </div>
+                        <field name="active" invisible="1"/>
+                        <notebook>
+                            <page string="Items">
+                                <field name="pricelist_item_ids">
+                                    <list editable="bottom">
+                                        <field name="service_type_id"/>
+                                        <field name="product_id"/>
+                                        <field name="price"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- List View -->
+        <record id="view_laundry_pricelist_list" model="ir.ui.view">
+            <field name="name">laundry.pricelist.list</field>
+            <field name="model">laundry.pricelist</field>
+            <field name="arch" type="xml">
+                <list string="Pricelists">
+                    <field name="name"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- Action -->
+        <record id="action_laundry_pricelist" model="ir.actions.act_window">
+            <field name="name">Pricelists</field>
+            <field name="res_model">laundry.pricelist</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+        <!-- Menu -->
+        <menuitem id="menu_laundry_pricelist" name="Pricelists"
+                  parent="laundry_management.laundry_management_menu"
+                  action="action_laundry_pricelist"
+                  sequence="30"
+                  groups="laundry_management.group_laundry_manager"/>
+    </data>
+</odoo>

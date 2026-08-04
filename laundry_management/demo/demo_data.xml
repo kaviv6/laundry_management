@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!-- ============================================================
+             CUSTOMERS (Partners)
+        ============================================================ -->
+        <record id="partner_rahul_sharma" model="res.partner">
+            <field name="name">Rahul Sharma</field>
+            <field name="email">rahul@freshfold.com</field>
+            <field name="phone">+91 98765 43210</field>
+            <field name="street">12, MG Road, Navrangpura</field>
+            <field name="city">Ahmedabad</field>
+            <field name="zip">380009</field>
+            <field name="customer_rank">1</field>
+        </record>
+
+        <record id="partner_priya_patel" model="res.partner">
+            <field name="name">Priya Patel</field>
+            <field name="email">priya@freshfold.com</field>
+            <field name="phone">+91 87654 32109</field>
+            <field name="street">45, Satellite Road</field>
+            <field name="city">Ahmedabad</field>
+            <field name="zip">380015</field>
+            <field name="customer_rank">1</field>
+        </record>
+
+        <record id="partner_amit_kumar" model="res.partner">
+            <field name="name">Amit Kumar</field>
+            <field name="email">amit@freshfold.com</field>
+            <field name="phone">+91 76543 21098</field>
+            <field name="street">78, Ring Road</field>
+            <field name="city">Surat</field>
+            <field name="zip">395002</field>
+            <field name="customer_rank">1</field>
+        </record>
+
+        <!-- B2B customer -->
+        <record id="partner_grand_hotel" model="res.partner">
+            <field name="name">The Grand Hotel</field>
+            <field name="email">manager@grandhotel.com</field>
+            <field name="phone">+91 79 2656 0000</field>
+            <field name="street">Nr. Law Garden, Ellis Bridge</field>
+            <field name="city">Ahmedabad</field>
+            <field name="zip">380006</field>
+            <field name="is_company">True</field>
+            <field name="customer_rank">1</field>
+        </record>
+
+        <!-- ============================================================
+             USERS
+        ============================================================ -->
+        <record id="user_rahul" model="res.users">
+            <field name="name">Rahul Sharma</field>
+            <field name="login">rahul@freshfold.com</field>
+            <field name="password">demo123</field>
+            <field name="partner_id" ref="partner_rahul_sharma"/>
+            <field name="group_ids" eval="[Command.set([ref('laundry_management.group_laundry_user')])]"/>
+        </record>
+
+        <record id="user_priya" model="res.users">
+            <field name="name">Priya Patel</field>
+            <field name="login">priya@freshfold.com</field>
+            <field name="password">demo123</field>
+            <field name="partner_id" ref="partner_priya_patel"/>
+            <field name="group_ids" eval="[Command.set([ref('laundry_management.group_laundry_user')])]"/>
+        </record>
+
+        <record id="user_amit" model="res.users">
+            <field name="name">Amit Kumar</field>
+            <field name="login">amit@freshfold.com</field>
+            <field name="password">demo123</field>
+            <field name="partner_id" ref="partner_amit_kumar"/>
+            <field name="group_ids" eval="[Command.set([ref('laundry_management.group_laundry_user')])]"/>
+        </record>
+
+        <!-- Rider -->
+        <record id="user_vikram_rider" model="res.users">
+            <field name="name">Vikram Singh</field>
+            <field name="login">vikram@freshfold.com</field>
+            <field name="password">rider123</field>
+            <field name="group_ids" eval="[Command.set([ref('laundry_management.group_laundry_rider')])]"/>
+        </record>
+
+        <!-- ============================================================
+             LAUNDRY ORDERS
+        ============================================================ -->
+
+        <!-- Order 1: Rahul — Draft — COD -->
+        <record id="demo_order_rahul_001" model="laundry.order">
+            <field name="partner_id" ref="partner_rahul_sharma"/>
+            <field name="laundry_person_id" ref="base.user_root"/>
+            <field name="rider_id" ref="user_vikram_rider"/>
+            <field name="payment_method">cod</field>
+            <field name="state">draft</field>
+            <field name="note">Handle with care — silk shirts included.</field>
+        </record>
+        <record id="demo_order_line_r1_1" model="laundry.order.line">
+            <field name="laundry_id" ref="demo_order_rahul_001"/>
+            <field name="product_id" ref="product_product_laundry_service"/>
+            <field name="service_type_id" ref="service_type_normal_wash"/>
+            <field name="qty">5</field>
+        </record>
+        <record id="demo_order_line_r1_2" model="laundry.order.line">
+            <field name="laundry_id" ref="demo_order_rahul_001"/>
+            <field name="product_id" ref="product_product_laundry_service"/>
+            <field name="service_type_id" ref="service_type_steam_press"/>
+            <field name="qty">3</field>
+        </record>
+
+        <!-- Order 2: Priya — Confirmed (order) — Online -->
+        <record id="demo_order_priya_001" model="laundry.order">
+            <field name="partner_id" ref="partner_priya_patel"/>
+            <field name="laundry_person_id" ref="base.user_root"/>
+            <field name="rider_id" ref="user_vikram_rider"/>
+            <field name="payment_method">online</field>
+            <field name="state">order</field>
+        </record>
+        <record id="demo_order_line_p1_1" model="laundry.order.line">
+            <field name="laundry_id" ref="demo_order_priya_001"/>
+            <field name="product_id" ref="product_product_laundry_service"/>
+            <field name="service_type_id" ref="service_type_DC"/>
+            <field name="qty">2</field>
+        </record>
+        <record id="demo_order_line_p1_2" model="laundry.order.line">
+            <field name="laundry_id" ref="demo_order_priya_001"/>
+            <field name="product_id" ref="product_product_laundry_service"/>
+            <field name="service_type_id" ref="service_type_stain_removal"/>
+            <field name="qty">1</field>
+        </record>
+
+        <!-- Order 3: Amit — Draft — Wallet -->
+        <record id="demo_order_amit_001" model="laundry.order">
+            <field name="partner_id" ref="partner_amit_kumar"/>
+            <field name="laundry_person_id" ref="base.user_root"/>
+            <field name="payment_method">wallet</field>
+            <field name="state">draft</field>
+        </record>
+        <record id="demo_order_line_a1_1" model="laundry.order.line">
+            <field name="laundry_id" ref="demo_order_amit_001"/>
+            <field name="product_id" ref="product_product_laundry_service"/>
+            <field name="service_type_id" ref="service_type_roll_press"/>
+            <field name="qty">4</field>
+        </record>
+        <record id="demo_order_line_a1_2" model="laundry.order.line">
+            <field name="laundry_id" ref="demo_order_amit_001"/>
+            <field name="product_id" ref="product_product_laundry_service"/>
+            <field name="service_type_id" ref="service_type_bleaching"/>
+            <field name="qty">2</field>
+        </record>
+
+        <!-- Order 4: Rahul second order — Cancelled -->
+        <record id="demo_order_rahul_002" model="laundry.order">
+            <field name="partner_id" ref="partner_rahul_sharma"/>
+            <field name="laundry_person_id" ref="base.user_root"/>
+            <field name="payment_method">cod</field>
+            <field name="state">cancel</field>
+        </record>
+        <record id="demo_order_line_r2_1" model="laundry.order.line">
+            <field name="laundry_id" ref="demo_order_rahul_002"/>
+            <field name="product_id" ref="product_product_laundry_service"/>
+            <field name="service_type_id" ref="service_type_petrol_wash"/>
+            <field name="qty">1</field>
+        </record>
+
+        <!-- ============================================================
+             PICKUP REQUESTS
+        ============================================================ -->
+
+        <!-- Pickup 1: Rahul — Scheduled, assigned to Vikram -->
+        <record id="demo_pickup_rahul_001" model="laundry.pickup.request">
+            <field name="partner_id" ref="partner_rahul_sharma"/>
+            <field name="laundry_person_id" ref="user_vikram_rider"/>
+            <field name="schedule_date" eval="(DateTime.now() + relativedelta(days=1)).strftime('%Y-%m-%d 10:00:00')"/>
+            <field name="payment_method">cod</field>
+            <field name="state">scheduled</field>
+        </record>
+        <record id="demo_pickup_line_r1_1" model="laundry.pickup.request.line">
+            <field name="request_id" ref="demo_pickup_rahul_001"/>
+            <field name="product_id" ref="product_product_laundry_service"/>
+            <field name="service_type_id" ref="service_type_normal_wash"/>
+            <field name="qty">6</field>
+        </record>
+        <record id="demo_pickup_line_r1_2" model="laundry.pickup.request.line">
+            <field name="request_id" ref="demo_pickup_rahul_001"/>
+            <field name="product_id" ref="product_product_laundry_service"/>
+            <field name="service_type_id" ref="service_type_steam_press"/>
+            <field name="qty">2</field>
+        </record>
+
+        <!-- Pickup 2: Priya — Picked Up, linked to her order -->
+        <record id="demo_pickup_priya_001" model="laundry.pickup.request">
+            <field name="partner_id" ref="partner_priya_patel"/>
+            <field name="laundry_person_id" ref="user_vikram_rider"/>
+            <field name="schedule_date" eval="(DateTime.now() - relativedelta(days=1)).strftime('%Y-%m-%d 09:00:00')"/>
+            <field name="pickup_date" eval="(DateTime.now() - relativedelta(hours=3)).strftime('%Y-%m-%d %H:%M:%S')"/>
+            <field name="payment_method">online</field>
+            <field name="order_id" ref="demo_order_priya_001"/>
+            <field name="state">picked</field>
+        </record>
+        <record id="demo_pickup_line_p1_1" model="laundry.pickup.request.line">
+            <field name="request_id" ref="demo_pickup_priya_001"/>
+            <field name="product_id" ref="product_product_laundry_service"/>
+            <field name="service_type_id" ref="service_type_DC"/>
+            <field name="qty">2</field>
+        </record>
+
+        <!-- Pickup 3: Amit — Draft (just created) -->
+        <record id="demo_pickup_amit_001" model="laundry.pickup.request">
+            <field name="partner_id" ref="partner_amit_kumar"/>
+            <field name="schedule_date" eval="(DateTime.now() + relativedelta(days=2)).strftime('%Y-%m-%d 11:00:00')"/>
+            <field name="payment_method">wallet</field>
+            <field name="state">draft</field>
+        </record>
+        <record id="demo_pickup_line_a1_1" model="laundry.pickup.request.line">
+            <field name="request_id" ref="demo_pickup_amit_001"/>
+            <field name="product_id" ref="product_product_laundry_service"/>
+            <field name="service_type_id" ref="service_type_roll_press"/>
+            <field name="qty">4</field>
+        </record>
+
+        <!-- ============================================================
+             PRICELIST (B2B)
+        ============================================================ -->
+        <record id="demo_pricelist_standard" model="laundry.pricelist">
+            <field name="name">Standard Retail Pricelist</field>
+        </record>
+        <record id="demo_pricelist_item_1" model="laundry.pricelist.item">
+            <field name="pricelist_id" ref="demo_pricelist_standard"/>
+            <field name="service_type_id" ref="service_type_normal_wash"/>
+            <field name="price">15</field>
+        </record>
+        <record id="demo_pricelist_item_2" model="laundry.pricelist.item">
+            <field name="pricelist_id" ref="demo_pricelist_standard"/>
+            <field name="service_type_id" ref="service_type_DC"/>
+            <field name="price">50</field>
+        </record>
+        <record id="demo_pricelist_item_3" model="laundry.pricelist.item">
+            <field name="pricelist_id" ref="demo_pricelist_standard"/>
+            <field name="service_type_id" ref="service_type_steam_press"/>
+            <field name="price">30</field>
+        </record>
+
+        <record id="demo_pricelist_hotel" model="laundry.pricelist">
+            <field name="name">Hotel B2B Pricelist</field>
+        </record>
+        <record id="demo_pricelist_hotel_item_1" model="laundry.pricelist.item">
+            <field name="pricelist_id" ref="demo_pricelist_hotel"/>
+            <field name="service_type_id" ref="service_type_normal_wash"/>
+            <field name="price">10</field>
+        </record>
+        <record id="demo_pricelist_hotel_item_2" model="laundry.pricelist.item">
+            <field name="pricelist_id" ref="demo_pricelist_hotel"/>
+            <field name="service_type_id" ref="service_type_DC"/>
+            <field name="price">40</field>
+        </record>
+
+        <!-- ============================================================
+             CONTRACT REQUEST (B2B Lead)
+        ============================================================ -->
+        <record id="demo_contract_request_hotel" model="laundry.contract.request">
+            <field name="partner_id" ref="partner_grand_hotel"/>
+            <field name="contact_name">Rajesh Mehta</field>
+            <field name="email_from">rajesh@grandhotel.com</field>
+            <field name="phone">+91 98989 12345</field>
+            <field name="company_type">hotel</field>
+            <field name="pricelist_id" ref="demo_pricelist_hotel"/>
+            <field name="collection_time">9.0</field>
+            <field name="state">submitted</field>
+        </record>
+
+    </data>
+</odoo>

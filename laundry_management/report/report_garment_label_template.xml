@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_garment_label_template">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <div style="width: 8cm; padding: 12px; border: 1px solid #ccc; font-family: monospace; page-break-after: always;">
+                    <div style="text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 4px;">
+                        Laundry Tag
+                    </div>
+                    <div style="text-align: center; margin-bottom: 8px;">
+                        <img t-att-src="'/report/barcode/Code128/' + doc.barcode + '?width=300&amp;height=60&amp;humanreadable=1'"
+                             style="max-width: 100%;"/>
+                    </div>
+                    <table style="width: 100%; font-size: 11px; border-collapse: collapse;">
+                        <tr>
+                            <td style="font-weight: bold; padding: 2px 4px;">Order</td>
+                            <td style="padding: 2px 4px;"><t t-esc="doc.order_id.name"/></td>
+                        </tr>
+                        <tr>
+                            <td style="font-weight: bold; padding: 2px 4px;">Customer</td>
+                            <td style="padding: 2px 4px;"><t t-esc="doc.partner_id.name"/></td>
+                        </tr>
+                        <tr>
+                            <td style="font-weight: bold; padding: 2px 4px;">Service</td>
+                            <td style="padding: 2px 4px;"><t t-esc="doc.service_type_id.name"/></td>
+                        </tr>
+                        <tr>
+                            <td style="font-weight: bold; padding: 2px 4px;">Pieces</td>
+                            <td style="padding: 2px 4px;"><t t-esc="doc.qty"/></td>
+                        </tr>
+                        <tr t-if="doc.notes">
+                            <td style="font-weight: bold; padding: 2px 4px;">Notes</td>
+                            <td style="padding: 2px 4px;"><t t-esc="doc.notes"/></td>
+                        </tr>
+                    </table>
+                    <div style="text-align: center; font-size: 10px; margin-top: 6px; color: #666;">
+                        <t t-esc="doc.barcode"/>
+                    </div>
+                </div>
+            </t>
+        </t>
+    </template>
+</odoo>

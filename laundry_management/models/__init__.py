@@ -3,5 +3,10 @@ from . import service_type
 from . import account_move
 from . import pickup_request
 from . import laundry_contract
-from . import hr_employee
+from . import laundry_pricelist
+from . import laundry_contract_request
+from . import laundry_garment
+from . import laundry_promo
+from . import laundry_service_zone
 from . import res_users
+from . import push_notification

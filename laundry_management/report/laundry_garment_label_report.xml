@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="action_report_garment_label" model="ir.actions.report">
+            <field name="name">Garment Label</field>
+            <field name="model">laundry.garment</field>
+            <field name="report_type">qweb-pdf</field>
+            <field name="report_name">laundry_management.report_garment_label_template</field>
+            <field name="report_file">laundry_management.report_garment_label_template</field>
+            <field name="binding_model_id" ref="model_laundry_garment"/>
+            <field name="binding_type">report</field>
+            <field name="paperformat_id" ref="base.paperformat_euro"/>
+        </record>
+    </data>
+</odoo>

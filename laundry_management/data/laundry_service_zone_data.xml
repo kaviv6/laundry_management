@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!--
+            Rajkot city service zone.
+            Admin can edit pin codes anytime from:
+            Laundry Management > Configuration > Service Zones
+        -->
+        <record id="zone_rajkot" model="laundry.service.zone">
+            <field name="name">Rajkot</field>
+            <field name="city">Rajkot</field>
+            <field name="active">True</field>
+            <field name="notes">All serviceable areas within Rajkot city.</field>
+            <field name="zip_codes">360001
+360002
+360003
+360004
+360005
+360006
+360007
+360020
+360021
+360022
+360023
+360024
+360025
+360030
+360035
+360040
+360050
+360055
+360060
+360061
+360062
+360063
+360064
+360065
+360070
+360110</field>
+        </record>
+    </data>
+</odoo>

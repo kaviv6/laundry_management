@@ -14,4 +14,11 @@
         <field name="company_id" eval="False"/>
         <field name="prefix">LPR</field>
     </record>
+    <record id="ir_sequence_laundry_contract_request" model="ir.sequence">
+        <field name="name">Laundry Contract Request</field>
+        <field name="code">laundry.contract.request</field>
+        <field eval="4" name="padding"/>
+        <field name="company_id" eval="False"/>
+        <field name="prefix">LCR</field>
+    </record>
 </odoo>

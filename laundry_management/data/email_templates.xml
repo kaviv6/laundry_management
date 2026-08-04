@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+
+        <!-- =====================================================
+             ORDER STATE CHANGE TEMPLATES
+             ===================================================== -->
+
+        <record id="email_template_order_confirmed" model="mail.template">
+            <field name="name">Laundry Order: Confirmed</field>
+            <field name="model_id" ref="model_laundry_order"/>
+            <field name="subject">Your laundry order {{ object.name }} has been confirmed</field>
+            <field name="email_to">{{ object.partner_id.email }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #2563EB;">Order Confirmed</h2>
+                    <p>Hi <strong>{{ object.partner_id.name }}</strong>,</p>
+                    <p>Your laundry order <strong>{{ object.name }}</strong> has been confirmed and is now being processed.</p>
+                    <table style="width:100%; border-collapse:collapse; margin-top:16px;">
+                        <tr style="background:#F3F4F6;">
+                            <th style="text-align:left; padding:8px; border:1px solid #E5E7EB;">Service</th>
+                            <th style="text-align:right; padding:8px; border:1px solid #E5E7EB;">Qty</th>
+                            <th style="text-align:right; padding:8px; border:1px solid #E5E7EB;">Amount</th>
+                        </tr>
+                        <t t-foreach="object.order_line_ids" t-as="line">
+                            <tr>
+                                <td style="padding:8px; border:1px solid #E5E7EB;">{{ line.service_type_id.name }}</td>
+                                <td style="text-align:right; padding:8px; border:1px solid #E5E7EB;">{{ line.qty }}</td>
+                                <td style="text-align:right; padding:8px; border:1px solid #E5E7EB;">{{ line.amount }}</td>
+                            </tr>
+                        </t>
+                        <tr style="font-weight:bold; background:#F3F4F6;">
+                            <td colspan="2" style="padding:8px; border:1px solid #E5E7EB;">Total</td>
+                            <td style="text-align:right; padding:8px; border:1px solid #E5E7EB;">{{ object.total_amount }}</td>
+                        </tr>
+                    </table>
+                    <p style="margin-top:16px; color:#6B7280;">Payment method: {{ object.payment_method }}</p>
+                    <p style="color:#6B7280;">Thank you for choosing our laundry service!</p>
+                </div>
+            </field>
+            <field name="auto_delete" eval="True"/>
+        </record>
+
+        <record id="email_template_order_invoiced" model="mail.template">
+            <field name="name">Laundry Order: Invoiced</field>
+            <field name="model_id" ref="model_laundry_order"/>
+            <field name="subject">Invoice ready for your laundry order {{ object.name }}</field>
+            <field name="email_to">{{ object.partner_id.email }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #16A34A;">Your Order is Complete!</h2>
+                    <p>Hi <strong>{{ object.partner_id.name }}</strong>,</p>
+                    <p>Great news — your laundry order <strong>{{ object.name }}</strong> has been completed and your invoice is ready.</p>
+                    <p><strong>Total Amount: {{ object.total_amount }} {{ object.currency_id.name }}</strong></p>
+                    <p style="color:#6B7280;">Your invoice has been sent as an attachment. Thank you for your business!</p>
+                </div>
+            </field>
+            <field name="auto_delete" eval="True"/>
+        </record>
+
+        <record id="email_template_order_cancelled" model="mail.template">
+            <field name="name">Laundry Order: Cancelled</field>
+            <field name="model_id" ref="model_laundry_order"/>
+            <field name="subject">Your laundry order {{ object.name }} has been cancelled</field>
+            <field name="email_to">{{ object.partner_id.email }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #DC2626;">Order Cancelled</h2>
+                    <p>Hi <strong>{{ object.partner_id.name }}</strong>,</p>
+                    <p>Your laundry order <strong>{{ object.name }}</strong> has been cancelled.</p>
+                    <p>If you have any questions, please contact us. We hope to serve you again soon.</p>
+                </div>
+            </field>
+            <field name="auto_delete" eval="True"/>
+        </record>
+
+        <!-- =====================================================
+             PICKUP REQUEST STATE CHANGE TEMPLATES
+             ===================================================== -->
+
+        <record id="email_template_pickup_scheduled" model="mail.template">
+            <field name="name">Laundry Pickup: Scheduled</field>
+            <field name="model_id" ref="model_laundry_pickup_request"/>
+            <field name="subject">Pickup scheduled for {{ object.name }}</field>
+            <field name="email_to">{{ object.partner_id.email }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #2563EB;">Pickup Scheduled</h2>
+                    <p>Hi <strong>{{ object.partner_id.name }}</strong>,</p>
+                    <p>Your laundry pickup <strong>{{ object.name }}</strong> has been scheduled.</p>
+                    <p><strong>Pickup Date:</strong> {{ object.schedule_date }}</p>
+                    <t t-if="object.laundry_person_id">
+                        <p><strong>Rider:</strong> {{ object.laundry_person_id.name }}</p>
+                    </t>
+                    <p>Please have your items ready. Our rider will be there on time!</p>
+                </div>
+            </field>
+            <field name="auto_delete" eval="True"/>
+        </record>
+
+        <record id="email_template_pickup_picked" model="mail.template">
+            <field name="name">Laundry Pickup: Items Collected</field>
+            <field name="model_id" ref="model_laundry_pickup_request"/>
+            <field name="subject">Your laundry items have been picked up — {{ object.name }}</field>
+            <field name="email_to">{{ object.partner_id.email }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #D97706;">Items Picked Up</h2>
+                    <p>Hi <strong>{{ object.partner_id.name }}</strong>,</p>
+                    <p>Your laundry items for <strong>{{ object.name }}</strong> have been picked up and are now being processed at our facility.</p>
+                    <t t-if="object.eta">
+                        <p><strong>Estimated Delivery:</strong> {{ object.eta }}</p>
+                    </t>
+                    <p>We will notify you once your laundry is ready for delivery.</p>
+                </div>
+            </field>
+            <field name="auto_delete" eval="True"/>
+        </record>
+
+        <record id="email_template_pickup_delivered" model="mail.template">
+            <field name="name">Laundry Pickup: Delivered</field>
+            <field name="model_id" ref="model_laundry_pickup_request"/>
+            <field name="subject">Your laundry has been delivered — {{ object.name }}</field>
+            <field name="email_to">{{ object.partner_id.email }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #16A34A;">Laundry Delivered!</h2>
+                    <p>Hi <strong>{{ object.partner_id.name }}</strong>,</p>
+                    <p>Your laundry for <strong>{{ object.name }}</strong> has been delivered successfully.</p>
+                    <p>We hope you are satisfied with our service. Please share your feedback!</p>
+                </div>
+            </field>
+            <field name="auto_delete" eval="True"/>
+        </record>
+
+        <record id="email_template_pickup_cancelled" model="mail.template">
+            <field name="name">Laundry Pickup: Cancelled</field>
+            <field name="model_id" ref="model_laundry_pickup_request"/>
+            <field name="subject">Your pickup request {{ object.name }} has been cancelled</field>
+            <field name="email_to">{{ object.partner_id.email }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #DC2626;">Pickup Cancelled</h2>
+                    <p>Hi <strong>{{ object.partner_id.name }}</strong>,</p>
+                    <p>Your laundry pickup request <strong>{{ object.name }}</strong> has been cancelled.</p>
+                    <p>Please contact us if you need to reschedule. We apologise for any inconvenience.</p>
+                </div>
+            </field>
+            <field name="auto_delete" eval="True"/>
+        </record>
+
+    </data>
+</odoo>

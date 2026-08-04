@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_laundry_service_zone_form" model="ir.ui.view">
+        <field name="name">laundry.service.zone.form</field>
+        <field name="model">laundry.service.zone</field>
+        <field name="arch" type="xml">
+            <form string="Service Zone">
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="%(laundry_management.laundry_pickup_request_action)d"
+                                type="action" class="oe_stat_button" icon="fa-motorcycle">
+                            <field name="pickup_count" string="Pickups" widget="statinfo"/>
+                        </button>
+                    </div>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger"
+                            invisible="active"/>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="city"/>
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                        <group>
+                            <field name="notes" placeholder="Internal notes…"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Serviceable Pin Codes">
+                            <p class="text-muted">
+                                Enter one pin code per line. The mobile app will check this list
+                                when a customer tries to schedule a pickup.
+                            </p>
+                            <field name="zip_codes"
+                                   placeholder="360001&#10;360002&#10;360003"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_laundry_service_zone_list" model="ir.ui.view">
+        <field name="name">laundry.service.zone.list</field>
+        <field name="model">laundry.service.zone</field>
+        <field name="arch" type="xml">
+            <list string="Service Zones">
+                <field name="name"/>
+                <field name="city"/>
+                <field name="pickup_count" string="Pickups"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_laundry_service_zone" model="ir.actions.act_window">
+        <field name="name">Service Zones</field>
+        <field name="res_model">laundry.service.zone</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="oe_view_nocontent_create">
+                Add a service zone to define which pin codes your laundry can serve.
+            </p>
+        </field>
+    </record>
+
+    <!-- Configuration submenu under Laundry Management -->
+    <menuitem id="menu_laundry_configuration"
+              name="Configuration"
+              parent="laundry_management.laundry_management_sub_menu"
+              sequence="99"
+              groups="laundry_management.group_laundry_manager"/>
+
+    <menuitem id="menu_laundry_service_zones"
+              name="Service Zones"
+              parent="laundry_management.menu_laundry_configuration"
+              action="action_laundry_service_zone"
+              sequence="1"
+              groups="laundry_management.group_laundry_manager"/>
+</odoo>

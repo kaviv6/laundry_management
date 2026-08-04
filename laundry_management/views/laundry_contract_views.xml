@@ -4,35 +4,65 @@
         <field name="name">laundry.contract.form</field>
         <field name="model">laundry.contract</field>
         <field name="arch" type="xml">
-            <form string="Laundry Contract" create="false" edit="false">
+            <form string="Laundry Contract">
                 <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_orders" type="object"
+                                class="oe_stat_button" icon="fa-shopping-basket">
+                            <field name="order_count" string="Orders" widget="statinfo"/>
+                        </button>
+                    </div>
                     <group>
-                        <group>
-                            <field name="name" readonly="1"/>
-                            <field name="partner_id" readonly="1"/>
-                            <field name="mobile" readonly="1"/>
-                            <field name="email" readonly="1"/>
+                        <group string="Customer">
+                            <field name="name"/>
+                            <field name="partner_id"/>
+                            <field name="mobile"/>
+                            <field name="email"/>
+                            <field name="business_type"/>
                         </group>
-                        <group>
-                            <field name="business_type" readonly="1"/>
-                            <field name="description" readonly="1"/>
+                        <group string="Pricing">
+                            <field name="pricelist_id"/>
                         </group>
                     </group>
+                    <notebook>
+                        <page string="Recurring Orders">
+                            <group>
+                                <field name="recurring_enabled" widget="boolean_toggle"/>
+                                <field name="recurring_interval"
+                                       invisible="not recurring_enabled"/>
+                                <field name="recurring_next_date"
+                                       invisible="not recurring_enabled"/>
+                            </group>
+                            <field name="recurring_service_ids"
+                                   invisible="not recurring_enabled">
+                                <list editable="bottom">
+                                    <field name="service_type_id"/>
+                                    <field name="qty"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Notes">
+                            <field name="description"/>
+                        </page>
+                    </notebook>
                 </sheet>
             </form>
         </field>
     </record>
 
     <record id="view_laundry_contract_tree" model="ir.ui.view">
-        <field name="name">laundry.contract.tree</field>
+        <field name="name">laundry.contract.list</field>
         <field name="model">laundry.contract</field>
         <field name="arch" type="xml">
-            <list string="Laundry Contracts" create="false" edit="false">
+            <list string="Laundry Contracts">
                 <field name="name"/>
                 <field name="partner_id"/>
                 <field name="mobile"/>
                 <field name="email"/>
                 <field name="business_type"/>
+                <field name="pricelist_id" optional="show"/>
+                <field name="recurring_enabled" optional="show"/>
+                <field name="order_count" optional="show"/>
             </list>
         </field>
     </record>

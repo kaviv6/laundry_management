@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <record id="ir_cron_laundry_recurring_orders" model="ir.cron">
+            <field name="name">Laundry: Generate Recurring B2B Orders</field>
+            <field name="model_id" ref="model_laundry_contract"/>
+            <field name="state">code</field>
+            <field name="code">model.cron_create_recurring_orders()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+<!--            <field name="numbercall">-1</field>-->
+            <field name="active">1</field>
+            <field name="nextcall" eval="(DateTime.now().replace(hour=5, minute=0, second=0)).strftime('%Y-%m-%d %H:%M:%S')"/>
+        </record>
+
+    </data>
+</odoo>

@@ -1,17 +1,23 @@
+from markupsafe import Markup
+
 from odoo import api, fields, models, _
 
 
 class LaundryPickupRequest(models.Model):
     _name = 'laundry.pickup.request'
     _description = 'Laundry Pickup Request'
-    _inherit = 'mail.thread'
+    _inherit = ['mail.thread', 'mail.activity.mixin']
     _order = 'schedule_date asc, id desc'
 
     name = fields.Char(string='Request', copy=False, default=lambda self: _('New'))
+    company_id = fields.Many2one(
+        'res.company', string='Company',
+        required=True, index=True, default=lambda self: self.env.company,
+    )
     partner_id = fields.Many2one('res.partner', string='Customer', required=True, tracking=True)
     laundry_person_id = fields.Many2one(
         'res.users', string='Rider', tracking=True,
-        domain="[('employee_ids.is_rider', '=', True)]",
+        domain=lambda self: [('group_ids', 'in', [self.env.ref('laundry_management.group_laundry_rider').id])],
     )
     street = fields.Char(related='partner_id.street', string='Street', store=True, readonly=True)
     street2 = fields.Char(related='partner_id.street2', string='Street2', store=True, readonly=True)
@@ -22,12 +28,19 @@ class LaundryPickupRequest(models.Model):
 
     schedule_date = fields.Datetime(string='Scheduled Pickup', tracking=True)
     pickup_date = fields.Datetime(string='Pickup Date', readonly=True, tracking=True)
+    eta = fields.Datetime(string='ETA', help='Estimated delivery time', tracking=True)
+    is_express = fields.Boolean(string='Express', default=False)
 
     line_ids = fields.One2many('laundry.pickup.request.line', 'request_id', string='Lines')
     total_amount = fields.Float(string='Total', compute='_compute_total_amount', store=True)
-    currency_id = fields.Many2one('res.currency', default=lambda self: self.env.company.currency_id.id)
+    currency_id = fields.Many2one(related='company_id.currency_id', store=True, readonly=True)
 
     order_id = fields.Many2one('laundry.order', string='Laundry Order', readonly=True, copy=False)
+    payment_method = fields.Selection([
+        ('cod', 'Cash on Delivery'),
+        ('online', 'Online Payment'),
+        ('wallet', 'Wallet'),
+    ], string='Payment Method', default='cod')
 
     state = fields.Selection([
         ('draft', 'Draft'),
@@ -35,7 +48,7 @@ class LaundryPickupRequest(models.Model):
         ('picked', 'Picked Up'),
         ('delivered', 'Delivered'),
         ('cancel', 'Cancelled'),
-    ], default='draft', tracking=True)
+    ], string='Status', default='draft', tracking=True)
 
     @api.depends('line_ids.amount')
     def _compute_total_amount(self):
@@ -49,41 +62,59 @@ class LaundryPickupRequest(models.Model):
                 vals['name'] = self.env['ir.sequence'].next_by_code('laundry.pickup.request')
         return super().create(vals_list)
 
+    # ------------------------------------------------------------------
+    # Auto-subscribe customer as follower
+    # ------------------------------------------------------------------
+    def _mail_get_partner_fields(self, introspect_fields=False):
+        return ['partner_id']
+
+    def _notify_customer(self, template_ref):
+        """Post a customer-visible chatter message (emails followers automatically)."""
+        template = self.env.ref(template_ref, raise_if_not_found=False)
+        if not template:
+            return
+        msg = template.sudo()._generate_template(
+            [self.id], ['subject', 'body_html']
+        )[self.id]
+        self.message_post(
+            body=Markup(msg.get('body_html') or ''),
+            subject=msg.get('subject') or '',
+            subtype_xmlid='mail.mt_comment',
+            partner_ids=[self.partner_id.id] if self.partner_id else [],
+        )
+
     def action_schedule(self):
         self.write({'state': 'scheduled'})
+        self._notify_customer('laundry_management.email_template_pickup_scheduled')
 
     def action_deliver(self):
         for request in self:
-            # If an order exists, close, invoice, and email using reusable method
-            # Use sudo() so Rider can trigger invoice/email operations
             if request.order_id:
-                request.order_id.process_close_invoice_and_email()
+                request.order_id.sudo().process_close_invoice_and_email()
             request.write({'state': 'delivered'})
+            request._notify_customer('laundry_management.email_template_pickup_delivered')
 
     def action_cancel(self):
         self.write({'state': 'cancel'})
+        self._notify_customer('laundry_management.email_template_pickup_cancelled')
 
     def action_pickup(self):
         for request in self:
             if not request.order_id:
-                # Create Laundry Order with lines from pickup request
-                order_vals = {
+                order = self.env['laundry.order'].create({
                     'partner_id': request.partner_id.id,
                     'laundry_person_id': self.env.user.id,
                     'rider_id': self.env.user.id,
-                    'order_line_ids': [],
-                }
-                line_vals_list = []
-                for line in request.line_ids:
-                    line_vals_list.append((0, 0, {
-                        'service_type_id': line.service_type_id.id,
-                        'qty': line.qty,
-                        'description': '',
-                    }))
-                order_vals['order_line_ids'] = line_vals_list
-                order = self.env['laundry.order'].create(order_vals)
+                    'payment_method': request.payment_method,
+                    'is_express': request.is_express,
+                    'order_line_ids': [
+                        (0, 0, {'service_type_id': ln.service_type_id.id, 'qty': ln.qty})
+                        for ln in request.line_ids
+                    ],
+                })
                 request.order_id = order.id
             request.write({'state': 'picked', 'pickup_date': fields.Datetime.now()})
+            request._notify_customer('laundry_management.email_template_pickup_picked')
 
     def action_open_map(self):
         """Open Google Maps directions to the customer's address.

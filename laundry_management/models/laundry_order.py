@@ -1,239 +1,334 @@
 import base64
 import logging
 
+from markupsafe import Markup
+
 from odoo import api, fields, models, _
+
 _logger = logging.getLogger(__name__)
 
+
 class LaundryOrder(models.Model):
-    """laundry orders generating model"""
     _name = 'laundry.order'
-    _inherit = ['mail.thread']
+    _inherit = ['mail.thread', 'mail.activity.mixin']
     _description = "Laundry Order"
     _order = 'order_date desc, id desc'
 
-    name = fields.Char(string="Label", copy=False, help="Name of the record")
-    invoice_count = fields.Integer(compute='_compute_invoice_count',
-                                   string='#Invoice',
-                                   help="Number of invoice count")
-    partner_id = fields.Many2one('res.partner', string='Customer',
-                                 readonly=True,
-                                 required=True,
-                                 change_default=True, index=True,
-                                 help="Name of customer"
-                                 )
-    order_date = fields.Datetime(string='Date', readonly=True, index=True,
-                                 copy=False, default=fields.Datetime.now,
-                                 help="Date of order")
-    laundry_person_id = fields.Many2one('res.users', string='Laundry Person',
-                                        required=True,
-                                        help="Name of laundry person", default=lambda self: self.env.user)
-    rider_id = fields.Many2one('res.users', string='Rider',
-                               help="Rider who picked up and delivered the order",
-                               domain="[('employee_ids.is_rider', '=', True)]")
-    order_line_ids = fields.One2many('laundry.order.line', 'laundry_id',
-                                     required=True, ondelete='cascade',
-                                     help="Order lines of laundry orders")
-    total_amount = fields.Float(compute='_compute_total_amount', string='Total',
-                                store=True,
-                                help="To get the Total amount")
-    currency_id = fields.Many2one("res.currency", string="Currency",
-                                  help="Name of currency", default=lambda self: self.env.company.currency_id.id)
-    note = fields.Text(string='Terms and conditions',
-                       help='Add terms and conditions')
-    pickup_request_ids = fields.One2many('laundry.pickup.request', 'order_id', string='Pickup Requests', readonly=True)
+    name = fields.Char(string="Order Ref", copy=False, readonly=True)
+    company_id = fields.Many2one(
+        'res.company', string='Company',
+        required=True, index=True, default=lambda self: self.env.company,
+    )
+    currency_id = fields.Many2one(
+        related='company_id.currency_id', store=True, readonly=True,
+    )
+    partner_id = fields.Many2one(
+        'res.partner', string='Customer',
+        readonly=True, required=True, change_default=True, index=True,
+        tracking=True,
+    )
+    order_date = fields.Datetime(
+        string='Date', readonly=True, index=True,
+        copy=False, default=fields.Datetime.now,
+    )
+    laundry_person_id = fields.Many2one(
+        'res.users', string='Laundry Person', required=True,
+        default=lambda self: self.env.user,
+        tracking=True,
+    )
+    rider_id = fields.Many2one(
+        'res.users', string='Rider', tracking=True,
+        domain=lambda self: [
+            ('group_ids', 'in', [self.env.ref('laundry_management.group_laundry_rider').id])
+        ],
+    )
+    order_line_ids = fields.One2many(
+        'laundry.order.line', 'laundry_id', string='Order Lines', required=True,
+    )
+    total_amount = fields.Float(
+        compute='_compute_total_amount', string='Total', store=True,
+    )
+    note = fields.Text(string='Terms and Conditions')
+    promo_id = fields.Many2one(
+        'laundry.promo.code', string='Promo Applied',
+        readonly=True, copy=False, ondelete='set null',
+    )
+    promo_discount = fields.Float(
+        string='Promo Discount', readonly=True, copy=False, default=0.0,
+    )
+    payment_method = fields.Selection([
+        ('cod', 'Cash on Delivery'),
+        ('online', 'Online Payment'),
+        ('wallet', 'Wallet'),
+    ], string='Payment Method', default='cod', tracking=True)
+    pickup_request_ids = fields.One2many(
+        'laundry.pickup.request', 'order_id', string='Pickup Requests', readonly=True,
+    )
+    contract_id = fields.Many2one(
+        'laundry.contract', string='B2B Contract',
+        help='Pricelist from the contract overrides default service type prices',
+        tracking=True,
+    )
+    is_express = fields.Boolean(
+        string='Express Service', default=False,
+        help='Priority processing — applies a 20% surcharge',
+        tracking=True,
+    )
+    eta = fields.Datetime(string='ETA', help='Estimated delivery/completion time', tracking=True)
     state = fields.Selection([
         ('draft', 'Draft'),
-        ('order', 'Laundry Order'),
+        ('order', 'Confirmed'),
         ('invoiced', 'Invoiced'),
         ('cancel', 'Cancelled'),
     ], string='Status', readonly=True, copy=False, index=True,
-        track_visibility='onchange', default='draft', help="State of the Order")
+        tracking=True, default='draft',
+    )
 
+    # ------------------------------------------------------------------
+    # Rating fields (simple per-order rating, no rating.mixin dependency)
+    # ------------------------------------------------------------------
+    customer_rating = fields.Float(
+        string='Rating', digits=(2, 1), default=0.0,
+        readonly=True, copy=False,
+    )
+    customer_review = fields.Text(string='Customer Review', readonly=True, copy=False)
+
+    @api.depends('customer_rating')
+    def _compute_rating_stats(self):
+        for order in self:
+            if order.customer_rating > 0:
+                order.rating_avg = order.customer_rating
+                order.rating_count = 1
+            else:
+                order.rating_avg = 0.0
+                order.rating_count = 0
+
+    rating_avg = fields.Float(
+        string='Average Rating', compute='_compute_rating_stats', store=True,
+    )
+    rating_count = fields.Integer(
+        string='Rating Count', compute='_compute_rating_stats', store=True,
+    )
+
+    # ------------------------------------------------------------------
+    # invoice stat (search by origin avoids a stored FK)
+    # ------------------------------------------------------------------
+    invoice_count = fields.Integer(compute='_compute_invoice_count', string='Invoices')
+    garment_count = fields.Integer(compute='_compute_garment_count', string='Garments')
+
+    # ------------------------------------------------------------------
+    # Auto-subscribe customer as follower so tracking posts email them
+    # ------------------------------------------------------------------
+    def _mail_get_partner_fields(self, introspect_fields=False):
+        return ['partner_id']
+
+    # ------------------------------------------------------------------
+    # Compute
+    # ------------------------------------------------------------------
     @api.model_create_multi
     def create(self, vals_list):
-        """Creating the record of Laundry order."""
         for vals in vals_list:
             vals['name'] = self.env['ir.sequence'].next_by_code('laundry.order')
         return super().create(vals_list)
 
-    @api.depends('order_line_ids')
+    @api.depends('order_line_ids.amount', 'promo_discount')
     def _compute_total_amount(self):
-        """Computing the total of total_amount in order lines."""
-        total = 0
         for order in self:
-            for line in order.order_line_ids:
-                total += line.amount
-            order.total_amount = total
+            subtotal = sum(order.order_line_ids.mapped('amount'))
+            order.total_amount = max(0.0, subtotal - order.promo_discount)
+
+    def _compute_invoice_count(self):
+        for order in self:
+            order.invoice_count = self.env['account.move'].search_count(
+                [('invoice_origin', '=', order.name), ('move_type', '=', 'out_invoice')]
+            )
+
+    def _compute_garment_count(self):
+        for order in self:
+            order.garment_count = self.env['laundry.garment'].search_count(
+                [('order_id', '=', order.id)]
+            )
+
+    # ------------------------------------------------------------------
+    # Chatter notification helper — uses message_post() so the message
+    # is stored in chatter AND emails followers (including the customer)
+    # ------------------------------------------------------------------
+    def _notify_customer(self, template_ref):
+        """Render a mail.template and post it to chatter (emails followers)."""
+        template = self.env.ref(template_ref, raise_if_not_found=False)
+        if not template:
+            return
+        msg = template.sudo()._generate_template(
+            [self.id], ['subject', 'body_html']
+        )[self.id]
+        self.message_post(
+            body=Markup(msg.get('body_html') or ''),
+            subject=msg.get('subject') or '',
+            subtype_xmlid='mail.mt_comment',
+            partner_ids=[self.partner_id.id] if self.partner_id else [],
+        )
+
+    # ------------------------------------------------------------------
+    # Business actions
+    # ------------------------------------------------------------------
+    def action_apply_promo(self, promo_code):
+        """Apply a promo code to the order. Returns the applied discount amount."""
+        self.ensure_one()
+        if self.state != 'draft':
+            raise Exception("Promo codes can only be applied to draft orders.")
+        if self.promo_id:
+            raise Exception("A promo code has already been applied to this order.")
+        subtotal = sum(self.order_line_ids.mapped('amount'))
+        promo = self.env['laundry.promo.code'].sudo().validate_and_get(promo_code, subtotal)
+        discounted_total = promo.apply_discount(subtotal)
+        discount_amount = subtotal - discounted_total
+        self.sudo().write({'promo_id': promo.id, 'promo_discount': discount_amount})
+        promo._increment_used()
+        return discount_amount
+
+    def action_wallet_pay(self):
+        """Pay the order total from the customer's wallet balance."""
+        self.ensure_one()
+        if self.state in ('invoiced', 'cancel'):
+            raise Exception(f"Cannot pay an order in state '{self.state}'.")
+        user = self.env['res.users'].sudo().search(
+            [('partner_id', '=', self.partner_id.id)], limit=1
+        )
+        if not user:
+            raise Exception("No user account found for this customer.")
+        if self.total_amount <= 0:
+            raise Exception("Order has no amount to pay.")
+        user.wallet_deduct(self.total_amount)
+        self.sudo().write({'payment_method': 'wallet'})
+        return True
 
     def close_order(self):
-        """Confirming the order and after confirming order,it will create the
-             washing model"""
         self.state = 'order'
+        self._notify_customer('laundry_management.email_template_order_confirmed')
 
-    def action_create_invoice(self):
-        """Creating a new invoice for the laundry orders.
-        Called by Admin from UI button — respects normal security."""
-        invoice = self.env['account.move'].create({
+    def action_cancel_order(self):
+        self.state = 'cancel'
+        self._notify_customer('laundry_management.email_template_order_cancelled')
+
+    def _build_invoice(self, use_sudo=False):
+        """Create, populate and post an invoice for this order. Returns the move."""
+        env = self.env if not use_sudo else self.env.sudo()
+        product = self.env.ref('laundry_management.product_product_laundry_service')
+        invoice = env['account.move'].create({
             'partner_id': self.partner_id.id,
             'move_type': 'out_invoice',
             'invoice_date': fields.Date.today(),
             'invoice_origin': self.name,
+            'invoice_line_ids': [
+                (0, 0, {
+                    'product_id': product.id,
+                    'quantity': line.qty,
+                    'price_unit': line.price_unit,
+                    'name': line.service_type_id.name or product.name,
+                })
+                for line in self.order_line_ids
+            ],
         })
-
-        product = self.env.ref('laundry_management.product_product_laundry_service')
-
-        for line in self.order_line_ids:
-            self.env['account.move.line'].create({
-                'move_id': invoice.id,
-                'product_id': product.id,
-                'quantity': line.qty,
-                'price_unit': line.price_unit,
-            })
-
-        invoice.action_post()
-        self.state = "invoiced"
-
+        invoice.sudo().action_post()
         return invoice
 
-    def action_cancel_order(self):
-        """Cancel the laundry order"""
-        self.state = 'cancel'
-
-    def _compute_invoice_count(self):
-        """Compute the invoice count."""
-        for order in self:
-            order.invoice_count = len(order.env['account.move'].search(
-                [('invoice_origin', '=', order.name)]))
+    def action_create_invoice(self):
+        """Admin UI button — create invoice and mark invoiced."""
+        self.ensure_one()
+        invoice = self._build_invoice()
+        self.state = 'invoiced'
+        self._notify_customer('laundry_management.email_template_order_invoiced')
+        return {
+            'type': 'ir.actions.act_window',
+            'res_model': 'account.move',
+            'view_mode': 'form',
+            'res_id': invoice.id,
+        }
 
     def action_view_invoice(self):
-        """Function for viewing Laundry orders invoices."""
         self.ensure_one()
-        inv_ids = []
-        for each in self.env['account.move'].search(
-                [('invoice_origin', '=', self.name)]):
-            inv_ids.append(each.id)
-        if inv_ids:
-            if len(inv_ids) <= 1:
-                value = {
-                    'view_type': 'form',
-                    'view_mode': 'form',
-                    'res_model': 'account.move',
-                    'view_id': self.env.ref('account.view_move_form').id,
-                    'type': 'ir.actions.act_window',
-                    'name': _('Invoice'),
-                    'res_id': inv_ids and inv_ids[0]
-                }
-            else:
-                value = {
-                    'domain': str([('id', 'in', inv_ids)]),
-                    'view_type': 'form',
-                    'view_mode': 'list,form',
-                    'res_model': 'account.move',
-                    'view_id': False,
-                    'type': 'ir.actions.act_window',
-                    'name': _('Invoice'),
-                }
-            return value
+        invoices = self.env['account.move'].search(
+            [('invoice_origin', '=', self.name), ('move_type', '=', 'out_invoice')]
+        )
+        if not invoices:
+            return False
+        action = {
+            'type': 'ir.actions.act_window',
+            'res_model': 'account.move',
+            'name': _('Invoices'),
+        }
+        if len(invoices) == 1:
+            action.update({'view_mode': 'form', 'res_id': invoices.id})
+        else:
+            action.update({'view_mode': 'list,form', 'domain': [('id', 'in', invoices.ids)]})
+        return action
 
     def action_view_pickups(self):
         self.ensure_one()
-        # Find related pickup requests via reverse M2O
         pickups = self.env['laundry.pickup.request'].search([('order_id', '=', self.id)])
         if not pickups:
             return False
+        action = {
+            'type': 'ir.actions.act_window',
+            'res_model': 'laundry.pickup.request',
+            'name': _('Pickup Requests'),
+        }
         if len(pickups) == 1:
-            return {
-                'type': 'ir.actions.act_window',
-                'name': _('Pickup Request'),
-                'res_model': 'laundry.pickup.request',
-                'view_mode': 'form',
-                'res_id': pickups.id,
-                'target': 'current',
-            }
+            action.update({'view_mode': 'form', 'res_id': pickups.id})
+        else:
+            action.update({'view_mode': 'list,form', 'domain': [('id', 'in', pickups.ids)]})
+        return action
+
+    def action_view_garments(self):
+        self.ensure_one()
         return {
             'type': 'ir.actions.act_window',
-            'name': _('Pickup Requests'),
-            'res_model': 'laundry.pickup.request',
+            'res_model': 'laundry.garment',
+            'name': _('Garments'),
             'view_mode': 'list,form',
-            'domain': [('id', 'in', pickups.ids)],
-            'target': 'current',
+            'domain': [('order_id', '=', self.id)],
+            'context': {'default_order_id': self.id},
         }
 
     def process_close_invoice_and_email(self):
-        """Close the order, create and post invoice, email PDF to customer.
+        """Close the order, invoice, and email the PDF to the customer.
 
-        This is a system-triggered flow (called from Rider's Deliver button
-        or the monthly cron). Uses sudo() ONLY here because:
-        - Rider doesn't have accounting permissions
-        - This is a controlled internal method, not a UI-callable action
-        - The entry point (action_deliver) already validates Rider's access
-          to the pickup request via normal ACLs and record rules
+        Called from the Rider Deliver button and the monthly cron.
+        Uses sudo() ONLY for accounting operations — the Rider group has no
+        accounting permissions. Entry point (action_deliver) validates Rider
+        access via normal ACLs before reaching here.
         """
         self.ensure_one()
-
-        # Close order (no sudo — Rider has write ACL on laundry.order)
         self.close_order()
 
-        # Create and post invoice (sudo — accounting permissions needed)
-        invoice = self.env['account.move'].sudo().create({
-            'partner_id': self.partner_id.id,
-            'move_type': 'out_invoice',
-            'invoice_date': fields.Date.today(),
-            'invoice_origin': self.name,
-        })
+        invoice = self._build_invoice(use_sudo=True)
+        self.state = 'invoiced'
+        self._notify_customer('laundry_management.email_template_order_invoiced')
 
-        product = self.env.ref('laundry_management.product_product_laundry_service')
-
-        for line in self.order_line_ids:
-            self.env['account.move.line'].sudo().create({
-                'move_id': invoice.id,
-                'product_id': product.id,
-                'quantity': line.qty,
-                'price_unit': line.price_unit,
-            })
-
-        invoice.sudo().action_post()
-        self.state = "invoiced"
-
-        if not invoice:
-            return False
-
-        # Generate invoice PDF and email (sudo — report/attachment permissions)
+        # Email invoice PDF using the standard account invoice email template
         pdf, _ = self.env['ir.actions.report'].sudo()._render_qweb_pdf(
             'account.account_invoices', invoice.id
         )
-        pdf_name = f"{invoice.name or 'Invoice'}.pdf"
-
         attachment = self.env['ir.attachment'].sudo().create({
-            'name': pdf_name,
+            'name': f"{invoice.name or 'Invoice'}.pdf",
             'type': 'binary',
             'datas': base64.b64encode(pdf),
             'res_model': 'account.move',
             'res_id': invoice.id,
             'mimetype': 'application/pdf',
         })
-
-        # Try to use standard account invoice email template
-        template = self.env.ref('account.email_template_edi_invoice', raise_if_not_found=False)
-        partner_email = self.partner_id.email
-        if template and partner_email:
-            template.sudo().send_mail(invoice.id, force_send=True, email_values={
-                'email_to': partner_email,
-                'attachment_ids': [attachment.id],
-            })
-
+        inv_template = self.env.ref('account.email_template_edi_invoice', raise_if_not_found=False)
+        if inv_template and self.partner_id.email:
+            inv_template.sudo().send_mail(
+                invoice.id, force_send=True,
+                email_values={'email_to': self.partner_id.email, 'attachment_ids': [attachment.id]},
+            )
         return invoice
 
     @api.model
     def cron_close_and_invoice_draft_orders(self):
-        """Scheduled job: On 1st of each month, close all draft laundry orders,
-        create and post invoices, and email the invoice PDF to the customer."""
-
-        # Only execute if there are draft orders
+        """Monthly cron: close all draft orders, create invoices, email PDFs."""
         draft_orders = self.search([('state', '=', 'draft')])
-        if not draft_orders:
-            return True
-
         for order in draft_orders:
             try:
                 order.process_close_invoice_and_email()
@@ -242,39 +337,46 @@ class LaundryOrder(models.Model):
         return True
 
 
-
 class LaundryOrderLine(models.Model):
-    """Laundry order lines generating model"""
     _name = 'laundry.order.line'
     _description = "Laundry Order Line"
 
-    date = fields.Date(string='Service Date', default=fields.Date.today())
-    product_id = fields.Many2one('product.product', string='service',
-                                 required=True, help="Name of the product", default=lambda self: self.env.ref(
-            'laundry_management.product_product_laundry_service'))
-    qty = fields.Integer(string='No of items', required=True,
-                         help="Number of quantity")
-    description = fields.Text(string='Description',
-                              help='Description of the line.')
-    service_type_id = fields.Many2one('service.type', string='Service Type',
-                                      required=True,
-                                      help='Select the type of service')
-    amount = fields.Float(compute='_compute_amount', string='Amount',
-                          help='Total amount of the line.')
-    laundry_id = fields.Many2one('laundry.order', string='Laundry Order',
-                                 help='Corresponding laundry order')
-    price_unit = fields.Float(string='Unit Price', compute='compute_price_unit')
+    date = fields.Date(string='Service Date', default=fields.Date.today)
+    product_id = fields.Many2one(
+        'product.product', string='Product', required=True,
+        default=lambda self: self.env.ref(
+            'laundry_management.product_product_laundry_service', raise_if_not_found=False
+        ),
+    )
+    qty = fields.Integer(string='Qty', required=True, default=1)
+    description = fields.Text(string='Description')
+    service_type_id = fields.Many2one('service.type', string='Service Type', required=True)
+    price_unit = fields.Float(string='Unit Price', compute='_compute_price_unit', store=True)
+    amount = fields.Float(string='Subtotal', compute='_compute_amount', store=True)
+    laundry_id = fields.Many2one('laundry.order', string='Order', ondelete='cascade')
 
-    @api.depends('service_type_id')
-    def compute_price_unit(self):
-        """compute unit price"""
+    @api.depends('service_type_id', 'qty', 'laundry_id.contract_id', 'laundry_id.is_express')
+    def _compute_price_unit(self):
         for line in self:
-            unit_price = line.service_type_id.amount
-            line.price_unit = unit_price
+            base = line.service_type_id.amount or 0.0
+            contract = line.laundry_id.contract_id
+            if contract and contract.pricelist_id:
+                # Best volume tier: highest min_qty that still applies for this qty
+                items = contract.pricelist_id.pricelist_item_ids.filtered(
+                    lambda i: i.service_type_id == line.service_type_id
+                              and i.min_qty <= (line.qty or 1)
+                ).sorted('min_qty', reverse=True)
+                if items:
+                    best = items[0]
+                    base = best.price * (1 - best.discount_percent / 100.0)
+            if line.laundry_id.is_express:
+                base = base * 1.20
+            line.price_unit = base
 
-    @api.depends('service_type_id', 'qty')
+    @api.depends('price_unit', 'qty')
     def _compute_amount(self):
-        """Compute the total amount"""
         for line in self:
-            total = line.service_type_id.amount * line.qty
-            line.amount = total
+            line.amount = line.price_unit * line.qty
+
+    # Keep old name as alias so existing code calling compute_price_unit still works
+    compute_price_unit = _compute_price_unit
