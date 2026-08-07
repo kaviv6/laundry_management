@@ -1,4 +1,6 @@
 from . import laundry_order
+from . import laundry_payment_log
+from . import payment_transaction
 from . import service_type
 from . import account_move
 from . import pickup_request
@@ -9,4 +11,7 @@ from . import laundry_garment
 from . import laundry_promo
 from . import laundry_service_zone
 from . import res_users
+from . import res_partner
+from . import res_company
+from . import res_config_settings
 from . import push_notification

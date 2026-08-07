@@ -73,10 +73,13 @@
         <field name="view_mode">list,form</field>
     </record>
 
+    <!-- Top-level "Contracts" tab; Contract Requests nests under it
+         (laundry_contract_request_views.xml) since a request is just the
+         pre-contract stage of the same B2B relationship. -->
     <menuitem id="menu_laundry_contract"
               name="Contracts"
-              parent="laundry_management.laundry_management_sub_menu"
+              parent="laundry_management.laundry_management_menu"
               action="action_laundry_contract"
-              sequence="20"
+              sequence="40"
               groups="laundry_management.group_laundry_user,laundry_management.group_laundry_manager"/>
 </odoo>

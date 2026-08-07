@@ -69,8 +69,8 @@
          ============================================================ -->
     <menuitem id="menu_laundry_reporting"
               name="Reporting"
-              parent="laundry_management.laundry_management_sub_menu"
-              sequence="90"
+              parent="laundry_management.laundry_management_menu"
+              sequence="60"
               groups="laundry_management.group_laundry_manager"/>
 
     <menuitem id="menu_laundry_revenue_report"

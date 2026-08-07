@@ -9,6 +9,7 @@ class LaundryContractRequest(models.Model):
 
     name = fields.Char(string='Request', copy=False, readonly=True, default=lambda self: _('New'))
     partner_id = fields.Many2one('res.partner', string='Company / Customer', tracking=True)
+    business_name = fields.Char(string='Business Name', tracking=True)
     contact_name = fields.Char(string='Contact Name')
     email_from = fields.Char(string='Email')
     phone = fields.Char(string='Phone')
@@ -45,7 +46,7 @@ class LaundryContractRequest(models.Model):
     def action_convert_to_contract(self):
         for req in self:
             self.env['laundry.contract'].create({
-                'name': req.contact_name or req.partner_id.name or req.name,
+                'name': req.business_name or req.contact_name or req.partner_id.name or req.name,
                 'partner_id': req.partner_id.id,
                 'mobile': req.phone or '',
                 'email': req.email_from or '',

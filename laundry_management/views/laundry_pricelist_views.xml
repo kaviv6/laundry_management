@@ -48,9 +48,10 @@
             <field name="view_mode">list,form</field>
         </record>
 
-        <!-- Menu -->
+        <!-- Menu — grouped under Configuration alongside Products/Service
+             Types/Service Zones/Settings, not a standalone top-level tab. -->
         <menuitem id="menu_laundry_pricelist" name="Pricelists"
-                  parent="laundry_management.laundry_management_menu"
+                  parent="laundry_management.menu_laundry_configuration"
                   action="action_laundry_pricelist"
                   sequence="30"
                   groups="laundry_management.group_laundry_manager"/>

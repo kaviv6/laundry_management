@@ -94,10 +94,10 @@
         <field name="view_mode">list,form</field>
     </record>
 
-    <!-- Pickup Requests menu is visible to all 3 roles -->
+    <!-- Pickups menu is visible to all 3 roles -->
     <menuitem id="laundry_pickup_request_menu"
-              name="Pickup Requests"
-              parent="laundry_management.laundry_management_sub_menu"
+              name="Pickups"
+              parent="laundry_management.laundry_management_menu"
               action="laundry_pickup_request_action"
-              sequence="40"/>
+              sequence="20"/>
 </odoo>

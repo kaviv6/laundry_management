@@ -40,17 +40,18 @@
         <field name="view_mode">list,form</field>
     </record>
     <!--    Defined Menus-->
-    <menuitem id="laundry_config_menu" name="Configuration"
-              parent="laundry_management_menu" sequence="3"
-              groups="laundry_management.group_laundry_manager"/>
     <menuitem id="laundry_customer" name="Customers"
-              parent="laundry_management.laundry_management_sub_menu"
-              action="base.action_partner_customer_form" sequence="2"
+              parent="laundry_management.laundry_management_menu"
+              action="base.action_partner_customer_form" sequence="50"
               groups="laundry_management.group_laundry_manager"/>
+    <!-- Products/Service Types live under the single "Configuration" tab
+         defined in laundry_service_zone_views.xml (loaded before this file —
+         see __manifest__.py) alongside Pricelists/Service Zones/Settings,
+         instead of a second, differently-named Configuration menu. -->
     <menuitem id="laundry_products" name="Products"
-              parent="laundry_config_menu"
-              action="product.product_normal_action_sell" sequence="2"/>
-    <menuitem id="laundry_service_type" name="service Type"
-              parent="laundry_config_menu" action="service_type_action"
-              sequence="3"/>
+              parent="laundry_management.menu_laundry_configuration"
+              action="product.product_normal_action_sell" sequence="10"/>
+    <menuitem id="laundry_service_type" name="Service Types"
+              parent="laundry_management.menu_laundry_configuration" action="service_type_action"
+              sequence="20"/>
 </odoo>

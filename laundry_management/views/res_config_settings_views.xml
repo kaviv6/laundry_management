@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Standard Odoo settings-page pattern: inject an <app> block into the
+         shared Settings form (same structure every real Odoo app uses —
+         see e.g. addons/fleet/views/res_config_settings_views.xml). This
+         makes "Laundry Management" appear as its own tile in the Settings
+         app sidebar, in addition to the Configuration → Settings menu
+         below, both landing on the same block. -->
+    <record id="res_config_settings_view_form" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.laundry.management</field>
+        <field name="model">res.config.settings</field>
+        <field name="priority" eval="90"/>
+        <field name="inherit_id" ref="base_setup.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="Laundry Management" id="laundry_management" string="Laundry Management"
+                     name="laundry_management" groups="laundry_management.group_laundry_manager">
+                    <block title="Push Notifications" id="laundry_fcm_setting">
+                        <setting string="Firebase Cloud Messaging"
+                                 help="Lets the app notify customers and riders when an order or pickup changes state.">
+                            <div class="content-group">
+                                <div class="row mt8">
+                                    <label for="laundry_fcm_project_id" class="col-lg-3 o_light_label"/>
+                                    <field name="laundry_fcm_project_id" placeholder="e.g. bhagvatidrycleaners"/>
+                                </div>
+                                <div class="row mt8">
+                                    <label for="laundry_fcm_service_account_json" class="col-lg-3 o_light_label"/>
+                                    <field name="laundry_fcm_service_account_json" widget="text"
+                                           placeholder="Paste the full service account JSON file contents here"/>
+                                </div>
+                                <div class="text-muted mt8">
+                                    Firebase console → Project Settings → Service Accounts → Generate new private key.
+                                </div>
+                            </div>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="action_laundry_config_settings" model="ir.actions.act_window">
+        <field name="name">Settings</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="context">{'module': 'laundry_management'}</field>
+    </record>
+
+    <menuitem id="menu_laundry_config_settings"
+              name="Settings"
+              parent="laundry_management.menu_laundry_configuration"
+              action="action_laundry_config_settings"
+              sequence="50"
+              groups="laundry_management.group_laundry_manager"/>
+</odoo>

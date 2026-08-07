@@ -8,7 +8,7 @@
                    'service',
     'author': 'Keval Vaja',
     'maintainer': 'Keval Vaja',
-    'depends': ['base', 'web', 'mail', 'account', 'product'],
+    'depends': ['base', 'web', 'mail', 'account', 'product', 'base_geolocalize', 'payment'],
 
     'data': [
         'security/laundry_management_security.xml',
@@ -18,16 +18,22 @@
         'data/email_templates.xml',
         'data/recurring_cron_data.xml',
         'data/laundry_service_zone_data.xml',
+        # Menu load order matters: each file below parents its menuitem(s)
+        # onto a menu defined earlier in this list (app root -> Orders ->
+        # Pickups -> Garments -> Contracts -> Contract Requests -> the
+        # Configuration root -> everything nested under Configuration ->
+        # Reporting).
         'views/laundry_order_views.xml',
-        'views/service_type_views.xml',
-        'views/account_move_view.xml',
         'views/laundry_pickup_request_views.xml',
-        'views/laundry_contract_views.xml',
-        'views/laundry_pricelist_views.xml',
-        'views/laundry_contract_request_views.xml',
         'views/laundry_garment_views.xml',
-        'views/laundry_dashboard_views.xml',
+        'views/laundry_contract_views.xml',
+        'views/laundry_contract_request_views.xml',
         'views/laundry_service_zone_views.xml',
+        'views/service_type_views.xml',
+        'views/laundry_pricelist_views.xml',
+        'views/res_config_settings_views.xml',
+        'views/laundry_dashboard_views.xml',
+        'views/account_move_view.xml',
         'report/laundry_pricelist_report.xml',
         'report/report_laundry_pricelist_template.xml',
         'report/laundry_garment_label_report.xml',

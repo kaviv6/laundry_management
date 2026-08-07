@@ -24,10 +24,14 @@ class LaundryPushService(models.AbstractModel):
     # ------------------------------------------------------------------
 
     def _get_fcm_creds(self):
-        get = self.env['ir.config_parameter'].sudo().get_param
+        """Per-company credentials (Settings → Laundry Management →
+        Push Notifications) — not a global ir.config_parameter, since a
+        multi-company setup can run a different Firebase project per
+        branch/company."""
+        company = self.env.company
         return (
-            get('laundry_management.fcm_project_id', ''),
-            get('laundry_management.fcm_service_account_json', ''),
+            company.laundry_fcm_project_id or '',
+            company.laundry_fcm_service_account_json or '',
         )
 
     # ------------------------------------------------------------------
@@ -79,7 +83,7 @@ class LaundryPushService(models.AbstractModel):
         """Send a single FCM v1 notification. Returns True on success, False on skip/error."""
         project_id, sa_json = self._get_fcm_creds()
         if not project_id or not sa_json:
-            _logger.debug('FCM not configured — skipping push. Set fcm_project_id and fcm_service_account_json in System Parameters.')
+            _logger.debug('FCM not configured — skipping push. Set it in Settings → Laundry Management → Configuration → Settings.')
             return False
 
         try:

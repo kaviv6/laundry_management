@@ -61,6 +61,13 @@
                             <field name="contract_id"
                                    groups="laundry_management.group_laundry_manager"/>
                             <field name="payment_method"/>
+                            <field name="payment_status" widget="badge"
+                                   decoration-success="payment_status == 'paid'"
+                                   decoration-warning="payment_status == 'partial'"
+                                   decoration-danger="payment_status == 'not_paid'"/>
+                            <field name="amount_due" widget="monetary"
+                                   options="{'currency_field': 'currency_id'}"
+                                   invisible="payment_status == 'paid'"/>
                         </group>
                         <group>
                             <field name="order_date" readonly="state != 'draft'"/>
@@ -97,6 +104,19 @@
                                        options="{'currency_field': 'currency_id'}"/>
                             </group>
                             <field name="note" placeholder="Terms and conditions…"/>
+                        </page>
+                        <page string="Payments">
+                            <field name="payment_log_ids" readonly="1">
+                                <list string="Payments">
+                                    <field name="create_date" string="Date"/>
+                                    <field name="amount" widget="monetary"
+                                           options="{'currency_field': 'currency_id'}"/>
+                                    <field name="method"/>
+                                    <field name="source"/>
+                                    <field name="collected_by_id"/>
+                                    <field name="reference" optional="hide"/>
+                                </list>
+                            </field>
                         </page>
                     </notebook>
                 </sheet>
@@ -167,12 +187,13 @@
     </record>
 
     <!-- Menus -->
+    <!-- App root icon. Top-level tabs (Orders, Pickups, Garments, Contracts,
+         Customers, Reporting, Configuration) hang directly off this — no
+         redundant middle "Laundry Management > Laundry Management" layer. -->
     <menuitem id="laundry_management_menu" name="Laundry Management"
               web_icon="laundry_management,static/description/icon.png"/>
-    <menuitem id="laundry_management_sub_menu" name="Laundry Management"
-              parent="laundry_management.laundry_management_menu" sequence="1"/>
-    <menuitem id="laundry_management_menu_order" name="Laundry Orders"
-              parent="laundry_management.laundry_management_sub_menu"
-              action="laundry_order_action" sequence="1"
+    <menuitem id="laundry_management_menu_order" name="Orders"
+              parent="laundry_management.laundry_management_menu"
+              action="laundry_order_action" sequence="10"
               groups="laundry_management.group_laundry_user,laundry_management.group_laundry_manager"/>
 </odoo>

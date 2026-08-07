@@ -1,8 +1,9 @@
+import json
 import re
 import secrets
 from datetime import timedelta
 
-from odoo import http, fields
+from odoo import api, http, fields, SUPERUSER_ID
 from odoo.http import request
 
 TOKEN_TTL_DAYS = 30
@@ -56,6 +57,49 @@ class LaundryAPI(http.Controller):
         """Return ISO-8601 string or None — consistent format for Flutter."""
         return dt.isoformat() if dt else None
 
+    @staticmethod
+    def _format_address(partner, primary_partner):
+        """Format a res.partner (the customer's own record, or one of its
+        `type='delivery'` child contacts) as a saved address for the app.
+        `primary_partner` is the customer's own partner — used to flag
+        whether this address is the one that can't be deleted.
+        """
+        return {
+            "id": partner.id,
+            "is_primary": partner.id == primary_partner.id,
+            "is_default": partner.laundry_is_default_address,
+            "label": partner.laundry_address_label or (
+                'Default' if partner.id == primary_partner.id else partner.name
+            ),
+            "street": partner.street or '',
+            "street2": partner.street2 or '',
+            "city": partner.city or '',
+            "zip": partner.zip or '',
+            "state": partner.state_id.name if partner.state_id else '',
+            "country": partner.country_id.name if partner.country_id else '',
+            "latitude": partner.partner_latitude,
+            "longitude": partner.partner_longitude,
+        }
+
+    @staticmethod
+    def _resolve_state_country(kwargs):
+        """Resolve `state`/`country` name strings from the request into
+        `state_id`/`country_id` vals — same ilike lookup used by signup()."""
+        vals = {}
+        if kwargs.get('state'):
+            st = request.env['res.country.state'].sudo().search(
+                [('name', 'ilike', kwargs['state'])], limit=1
+            )
+            if st:
+                vals['state_id'] = st.id
+        if kwargs.get('country'):
+            co = request.env['res.country'].sudo().search(
+                [('name', 'ilike', kwargs['country'])], limit=1
+            )
+            if co:
+                vals['country_id'] = co.id
+        return vals
+
     def _format_order(self, order, include_lines=False):
         subtotal = sum(order.order_line_ids.mapped('amount'))
         data = {
@@ -69,6 +113,9 @@ class LaundryAPI(http.Controller):
             "promo_code": order.promo_id.code if order.promo_id else None,
             "promo_discount": order.promo_discount,
             "total_amount": order.total_amount,
+            "amount_paid": order.amount_paid,
+            "amount_due": order.amount_due,
+            "payment_status": order.payment_status,
             "payment_method": order.payment_method,
             "is_express": order.is_express,
             "eta": self._fmt_dt(order.eta),
@@ -106,6 +153,8 @@ class LaundryAPI(http.Controller):
             "order_id": pr.order_id.id if pr.order_id else None,
             "rider_id": pr.laundry_person_id.id if pr.laundry_person_id else None,
             "rider_name": pr.laundry_person_id.name if pr.laundry_person_id else None,
+            "amount_due": pr.order_id.amount_due if pr.order_id else pr.total_amount,
+            "payment_status": pr.order_id.payment_status if pr.order_id else 'not_paid',
             "address": {
                 "street": pr.street or '',
                 "street2": pr.street2 or '',
@@ -113,6 +162,8 @@ class LaundryAPI(http.Controller):
                 "zip": pr.zip or '',
                 "state": pr.state_id.name if pr.state_id else '',
                 "country": pr.country_id.name if pr.country_id else '',
+                "latitude": pr.partner_id.partner_latitude or None,
+                "longitude": pr.partner_id.partner_longitude or None,
             },
         }
         if include_lines:
@@ -128,6 +179,20 @@ class LaundryAPI(http.Controller):
                 for line in pr.line_ids
             ]
         return data
+
+    def _format_contract_request(self, req):
+        return {
+            "id": req.id,
+            "name": req.name,
+            "business_name": req.business_name or '',
+            "contact_name": req.contact_name or '',
+            "email": req.email_from or '',
+            "phone": req.phone or '',
+            "business_type": req.company_type or 'other',
+            "notes": req.description or '',
+            "state": req.state,
+            "date": self._fmt_dt(req.create_date),
+        }
 
     # ==========================================
     # AUTH
@@ -190,14 +255,22 @@ class LaundryAPI(http.Controller):
         if request.env['res.users'].sudo().search([('login', '=', login)], limit=1):
             return {"status": False, "message": "User already exists"}
 
-        user = request.env['res.users'].sudo().create({
+        env = api.Environment(request.env.cr, SUPERUSER_ID, {'no_reset_password': True})
+        company = env['res.company'].search(
+            [('active', '=', True)], order='id asc', limit=1
+        )
+        if not company:
+            return {"status": False, "message": "System error: no company configured"}
+        user = env['res.users'].create({
             'name': name,
             'login': login,
             'password': password,
+            'company_id': company.id,
+            'company_ids': [(4, company.id)],
         })
 
-        laundry_group = request.env.ref('laundry_management.group_laundry_user')
-        user.sudo().write({'group_ids': [(4, laundry_group.id)]})
+        laundry_group = env.ref('laundry_management.group_laundry_user')
+        user.write({'group_ids': [(4, laundry_group.id)]})
 
         partner_vals = {}
         for field in ('phone', 'street', 'street2', 'city', 'zip'):
@@ -208,19 +281,19 @@ class LaundryAPI(http.Controller):
         if kwargs.get('longitude') is not None:
             partner_vals['partner_longitude'] = kwargs['longitude']
         if kwargs.get('state'):
-            st = request.env['res.country.state'].sudo().search(
+            st = env['res.country.state'].search(
                 [('name', 'ilike', kwargs['state'])], limit=1
             )
             if st:
                 partner_vals['state_id'] = st.id
         if kwargs.get('country'):
-            co = request.env['res.country'].sudo().search(
+            co = env['res.country'].search(
                 [('name', 'ilike', kwargs['country'])], limit=1
             )
             if co:
                 partner_vals['country_id'] = co.id
         if partner_vals:
-            user.partner_id.sudo().write(partner_vals)
+            user.partner_id.write(partner_vals)
 
         token = self._issue_token(user)
         return {
@@ -275,6 +348,289 @@ class LaundryAPI(http.Controller):
                 "country": partner.country_id.name if partner.country_id else '',
                 "latitude": partner.partner_latitude,
                 "longitude": partner.partner_longitude,
+            }
+        }
+
+    # ==========================================
+    # ADDRESS BOOK
+    # ==========================================
+    #
+    # The customer's own res.partner record (user.partner_id) is always
+    # address #1 — the first address a customer ever saves is written
+    # directly onto it (matching every other endpoint that already reads
+    # the customer's address straight off their partner, e.g.
+    # laundry.pickup.request's related address fields and
+    # action_open_map()'s use of partner_latitude/partner_longitude).
+    # Every additional address becomes a `type='delivery'` child contact
+    # (parent_id=partner.id) — Odoo's native multi-address pattern, visible
+    # in Contacts as sub-addresses of the customer.
+    #
+    # Every create/update that touches street/city/zip/state/country calls
+    # the customer's geo_localize() (from base_geolocalize) so
+    # partner_latitude/partner_longitude are always kept in sync — that's
+    # what the rider's "Navigate with Google Maps" action already reads.
+
+    @staticmethod
+    def _set_default_address(partner, target):
+        """Ensure exactly one of partner + its delivery children is flagged default."""
+        addresses = partner | request.env['res.partner'].sudo().search([
+            ('parent_id', '=', partner.id), ('type', '=', 'delivery'),
+        ])
+        (addresses - target).sudo().write({'laundry_is_default_address': False})
+        target.sudo().write({'laundry_is_default_address': True})
+
+    @http.route('/api/v1/address/list', type='jsonrpc', auth='none', methods=['POST'], csrf=False)
+    def address_list(self, **kwargs):
+        """List the customer's saved addresses — their own partner record
+        (if its address has been filled in) plus any delivery child contacts."""
+        user, error = self._authenticate()
+        if error:
+            return error
+
+        partner = user.partner_id
+        children = request.env['res.partner'].sudo().search([
+            ('parent_id', '=', partner.id), ('type', '=', 'delivery'),
+        ])
+        data = []
+        if partner.street:
+            data.append(self._format_address(partner, partner))
+        data += [self._format_address(c, partner) for c in children]
+        return {"status": True, "data": data}
+
+    @http.route('/api/v1/address/create', type='jsonrpc', auth='none', methods=['POST'], csrf=False)
+    def address_create(self, **kwargs):
+        """
+        Save a new address.
+
+        Body:
+          street: str            — required
+          street2, city, zip: str — optional
+          state, country: str     — optional, resolved by name
+          label: str              — optional, e.g. "Home", "Office"
+          set_default: bool       — optional
+          latitude, longitude: float — optional. Pass these when the app
+            obtained them directly from GPS or the map picker (via
+            /api/v1/geocode/reverse) — they're trusted as-is and skip the
+            forward-geocode, since a direct fix is more accurate than
+            re-deriving coordinates from the typed address text.
+        """
+        user, error = self._authenticate()
+        if error:
+            return error
+
+        street = kwargs.get('street')
+        if not street:
+            return {"status": False, "message": "Missing street"}
+
+        partner = user.partner_id
+        address_vals = {}
+        for field in ('street', 'street2', 'city', 'zip'):
+            if kwargs.get(field) is not None:
+                address_vals[field] = kwargs[field]
+        address_vals.update(self._resolve_state_country(kwargs))
+        if kwargs.get('label'):
+            address_vals['laundry_address_label'] = kwargs['label']
+
+        has_coords = kwargs.get('latitude') is not None and kwargs.get('longitude') is not None
+        if has_coords:
+            # Must be written in the same call as the address fields — see
+            # base_geolocalize's res.partner.write() override, which resets
+            # partner_latitude/longitude to 0.0 whenever street/city/etc.
+            # change unless both are included in that same write.
+            address_vals['partner_latitude'] = float(kwargs['latitude'])
+            address_vals['partner_longitude'] = float(kwargs['longitude'])
+
+        if not partner.street:
+            # First address this customer has ever saved — becomes their
+            # own partner record, exactly what every other part of the
+            # module already reads as "the customer's address".
+            target = partner
+            target.sudo().write(address_vals)
+        else:
+            target = request.env['res.partner'].sudo().create({
+                **address_vals,
+                'name': kwargs.get('label') or f'{partner.name} — Address',
+                'parent_id': partner.id,
+                'type': 'delivery',
+                'company_type': 'person',
+            })
+
+        if not has_coords:
+            target.sudo().geo_localize()
+
+        has_default = partner.laundry_is_default_address or bool(
+            request.env['res.partner'].sudo().search_count([
+                ('parent_id', '=', partner.id), ('type', '=', 'delivery'),
+                ('laundry_is_default_address', '=', True),
+            ])
+        )
+        if kwargs.get('set_default') or not has_default:
+            self._set_default_address(partner, target)
+
+        return {
+            "status": True,
+            "message": "Address saved",
+            "data": self._format_address(target, partner),
+        }
+
+    @http.route('/api/v1/address/update', type='jsonrpc', auth='none', methods=['POST'], csrf=False)
+    def address_update(self, **kwargs):
+        """
+        Update a saved address (the primary partner or one of its delivery
+        children).
+
+        Body:
+          address_id: int          — required
+          street, street2, city, zip, state, country, label: str — optional
+          set_default: bool        — optional
+          latitude, longitude: float — optional, see address/create — pass
+            these when they came straight from GPS/the map picker to skip
+            the forward-geocode and trust them as-is.
+        """
+        user, error = self._authenticate()
+        if error:
+            return error
+
+        address_id = kwargs.get('address_id')
+        if not address_id:
+            return {"status": False, "message": "Missing address_id"}
+
+        partner = user.partner_id
+        target = request.env['res.partner'].sudo().browse(int(address_id))
+        if not target.exists() or (target.id != partner.id and target.parent_id.id != partner.id):
+            return {"status": False, "message": "Address not found"}
+
+        address_vals = {}
+        for field in ('street', 'street2', 'city', 'zip'):
+            if kwargs.get(field) is not None:
+                address_vals[field] = kwargs[field]
+        address_vals.update(self._resolve_state_country(kwargs))
+        if kwargs.get('label') is not None:
+            address_vals['laundry_address_label'] = kwargs['label']
+
+        has_coords = kwargs.get('latitude') is not None and kwargs.get('longitude') is not None
+        if has_coords:
+            address_vals['partner_latitude'] = float(kwargs['latitude'])
+            address_vals['partner_longitude'] = float(kwargs['longitude'])
+
+        if address_vals:
+            target.sudo().write(address_vals)
+            if not has_coords and any(f in address_vals for f in ('street', 'street2', 'city', 'zip', 'state_id', 'country_id')):
+                target.sudo().geo_localize()
+
+        if kwargs.get('set_default'):
+            self._set_default_address(partner, target)
+
+        return {
+            "status": True,
+            "message": "Address updated",
+            "data": self._format_address(target, partner),
+        }
+
+    @http.route('/api/v1/address/delete', type='jsonrpc', auth='none', methods=['POST'], csrf=False)
+    def address_delete(self, **kwargs):
+        """Delete a saved address. The primary address (the customer's own
+        partner record) can never be deleted — only its delivery children."""
+        user, error = self._authenticate()
+        if error:
+            return error
+
+        address_id = kwargs.get('address_id')
+        if not address_id:
+            return {"status": False, "message": "Missing address_id"}
+
+        partner = user.partner_id
+        if int(address_id) == partner.id:
+            return {"status": False, "message": "Cannot delete your primary address"}
+
+        target = request.env['res.partner'].sudo().browse(int(address_id))
+        if not target.exists() or target.parent_id.id != partner.id or target.type != 'delivery':
+            return {"status": False, "message": "Address not found"}
+
+        was_default = target.laundry_is_default_address
+        target.sudo().unlink()
+
+        if was_default:
+            partner.sudo().write({'laundry_is_default_address': True})
+
+        return {"status": True, "message": "Address deleted"}
+
+    @http.route('/api/v1/address/set_default', type='jsonrpc', auth='none', methods=['POST'], csrf=False)
+    def address_set_default(self, **kwargs):
+        """Mark one saved address as the default for new pickups."""
+        user, error = self._authenticate()
+        if error:
+            return error
+
+        address_id = kwargs.get('address_id')
+        if not address_id:
+            return {"status": False, "message": "Missing address_id"}
+
+        partner = user.partner_id
+        target = request.env['res.partner'].sudo().browse(int(address_id))
+        if not target.exists() or (target.id != partner.id and target.parent_id.id != partner.id):
+            return {"status": False, "message": "Address not found"}
+
+        self._set_default_address(partner, target)
+        return {"status": True, "data": self._format_address(target, partner)}
+
+    @http.route('/api/v1/geocode/reverse', type='jsonrpc', auth='none', methods=['POST'], csrf=False)
+    def geocode_reverse(self, **kwargs):
+        """
+        Reverse-geocode a lat/lng pair into address fields — powers the
+        app's "Use current location" button and its map picker's "Confirm
+        location" step, via base_geolocalize's OpenStreetMap Nominatim call.
+
+        Body:
+          latitude, longitude: float — required
+
+        The returned street/city/state/zip/country are best-effort — the
+        app pre-fills the form with them but the customer can still edit
+        before saving. The echoed latitude/longitude are exactly what was
+        passed in, meant to be sent straight through to address/create or
+        address/update so the saved coordinates match what the user picked.
+        """
+        user, error = self._authenticate()
+        if error:
+            return error
+
+        latitude = kwargs.get('latitude')
+        longitude = kwargs.get('longitude')
+        if latitude is None or longitude is None:
+            return {"status": False, "message": "Missing latitude or longitude"}
+
+        try:
+            latitude = float(latitude)
+            longitude = float(longitude)
+        except (TypeError, ValueError):
+            return {"status": False, "message": "latitude/longitude must be numbers"}
+
+        try:
+            result = request.env['base.geocoder'].sudo()._call_openstreetmap_reverse(latitude, longitude)
+        except Exception as e:
+            return {"status": False, "message": str(e)}
+
+        address = (result or {}).get('address') or {}
+        if not address:
+            return {"status": False, "message": "Could not resolve an address for this location"}
+
+        street = ' '.join(p for p in (address.get('house_number'), address.get('road')) if p)
+        city = (
+            address.get('city') or address.get('town') or address.get('village')
+            or address.get('suburb') or address.get('county') or ''
+        )
+
+        return {
+            "status": True,
+            "data": {
+                "street": street or result.get('display_name', ''),
+                "street2": address.get('suburb') or address.get('neighbourhood') or '',
+                "city": city,
+                "zip": address.get('postcode') or '',
+                "state": address.get('state') or '',
+                "country": address.get('country') or '',
+                "latitude": latitude,
+                "longitude": longitude,
             }
         }
 
@@ -675,12 +1031,18 @@ class LaundryAPI(http.Controller):
     @http.route('/api/v1/order/pay', type='jsonrpc', auth='none', methods=['POST'], csrf=False)
     def initiate_payment(self, **kwargs):
         """
-        Initiate a Cashfree payment for a laundry order.
+        Initiate a Cashfree payment for a laundry order. Called either by the
+        customer paying from their own Orders screen, or by the rider
+        opening the checkout in person (e.g. handing the customer their
+        phone to pay by UPI/card at the door) — the `method` field
+        distinguishes the two so the payment counts toward the right place
+        once the webhook confirms it.
 
         Returns payment_session_id and cashfree_order_id for the Flutter cashfree_pg SDK.
 
         Body:
           order_id: int  — laundry.order id to pay
+          method: upi | card — required only when a rider (not the customer) is calling
         """
         user, error = self._authenticate()
         if error:
@@ -693,18 +1055,45 @@ class LaundryAPI(http.Controller):
         order = request.env['laundry.order'].with_user(user).browse(int(order_id))
         if not order.exists():
             return {"status": False, "message": "Order not found"}
-        if not self._is_admin(user) and order.partner_id != user.partner_id:
+
+        is_owner = order.partner_id == user.partner_id
+        is_rider_for_order = self._is_rider(user) and (
+            order.rider_id.id == user.id
+            or any(pr.laundry_person_id.id == user.id for pr in order.pickup_request_ids)
+        )
+        if not self._is_admin(user) and not is_owner and not is_rider_for_order:
             return {"status": False, "message": "Access denied"}
-        if order.state in ('invoiced', 'cancel'):
-            return {"status": False, "message": f"Cannot pay an order in state '{order.state}'"}
-        if order.total_amount <= 0:
-            return {"status": False, "message": "Order has no amount to pay"}
+
+        collect_method = None
+        if is_rider_for_order and not is_owner:
+            collect_method = kwargs.get('method')
+            if collect_method not in ('upi', 'card'):
+                return {"status": False, "message": "Missing/invalid method. Allowed: upi, card"}
+
+        # An order being 'invoiced' (delivered COD-style) doesn't mean it's
+        # been paid — only 'cancel' should actually block payment. Whether
+        # there's anything left to pay is the payment_status/amount_due
+        # check right below.
+        if order.state == 'cancel':
+            return {"status": False, "message": "Cannot pay a cancelled order"}
+        if order.payment_status == 'paid' or order.amount_due <= 0:
+            return {"status": False, "message": "This order is already fully paid"}
 
         provider = request.env['payment.provider'].sudo().search(
             [('code', '=', 'cashfree'), ('state', 'in', ('test', 'enabled'))], limit=1
         )
         if not provider:
             return {"status": False, "message": "Cashfree payment provider not configured"}
+        # A provider can be flipped to Test/Enabled with the Client Id /
+        # Client Secret fields still blank — that would otherwise surface as
+        # a confusing raw Cashfree auth error deep inside
+        # _cashfree_create_payment_order() instead of a clear message here.
+        if not provider.cashfree_client_id or not provider.cashfree_client_secret:
+            return {
+                "status": False,
+                "message": "Cashfree is enabled but its Client Id / Client Secret aren't set. "
+                           "Add them under Accounting → Configuration → Payment Providers → CashFree.",
+            }
 
         payment_method = request.env['payment.method'].sudo().search(
             [('code', 'in', ('upi', 'card', 'netbanking'))], limit=1
@@ -714,15 +1103,29 @@ class LaundryAPI(http.Controller):
 
         try:
             reference = request.env['payment.transaction'].sudo()._compute_reference('cashfree')
-            tx = request.env['payment.transaction'].sudo().create({
+            tx_vals = {
                 'provider_id': provider.id,
                 'payment_method_id': payment_method.id,
-                'amount': order.total_amount,
+                'amount': order.amount_due,
                 'currency_id': order.currency_id.id,
                 'partner_id': order.partner_id.id,
                 'reference': reference,
                 'operation': 'online_direct',
-            })
+                'laundry_order_id': order.id,
+            }
+            if collect_method:
+                tx_vals['laundry_collected_by_id'] = user.id
+                tx_vals['laundry_collect_method'] = collect_method
+            # If the order's already invoiced (e.g. COD-delivered but not yet
+            # paid), link the transaction to that invoice so account_payment's
+            # own post-processing cron auto-creates AND reconciles the
+            # account.payment against it — no manual reconciliation needed.
+            invoice = request.env['account.move'].sudo().search(
+                [('invoice_origin', '=', order.name), ('move_type', '=', 'out_invoice')], limit=1,
+            )
+            if invoice:
+                tx_vals['invoice_ids'] = [(6, 0, [invoice.id])]
+            tx = request.env['payment.transaction'].sudo().create(tx_vals)
             order_data = tx._cashfree_create_payment_order()
             return {
                 "status": True,
@@ -730,7 +1133,7 @@ class LaundryAPI(http.Controller):
                     "payment_session_id": order_data.get('payment_session_id'),
                     "cashfree_order_id": order_data.get('order_id'),
                     "txn_env": "sandbox" if provider.state == 'test' else "production",
-                    "amount": order.total_amount,
+                    "amount": order.amount_due,
                     "currency": order.currency_id.name,
                     "laundry_order_id": order.id,
                     "transaction_reference": tx.reference,
@@ -738,6 +1141,55 @@ class LaundryAPI(http.Controller):
             }
         except Exception as e:
             return {"status": False, "message": str(e)}
+
+    @http.route('/api/v1/order/<int:order_id>/invoice/pdf', type='http', auth='none', methods=['GET'], csrf=False)
+    def download_invoice_pdf(self, order_id, **kwargs):
+        """
+        Stream the order's tax invoice PDF — a plain `type='http'` route
+        (not jsonrpc) since the response body is a binary file, not JSON.
+        Auth still works the same way: pass `Authorization: Bearer <token>`
+        as a header on the GET request (the app's HTTP client sets this,
+        same as every other endpoint — a bare browser/webview open won't
+        have it, so this is meant to be fetched in-app then saved/shared).
+        """
+        def _json_error(message, status):
+            return request.make_response(
+                json.dumps({"status": False, "message": message}),
+                headers=[('Content-Type', 'application/json')],
+                status=status,
+            )
+
+        user, error = self._authenticate()
+        if error:
+            return _json_error(error.get('message', 'Unauthorized'), 401)
+
+        order = request.env['laundry.order'].with_user(user).browse(order_id)
+        if not order.exists():
+            return _json_error('Order not found', 404)
+        if not self._is_admin(user) and order.partner_id != user.partner_id:
+            return _json_error('Access denied', 403)
+
+        invoice = request.env['account.move'].sudo().search(
+            [('invoice_origin', '=', order.name), ('move_type', '=', 'out_invoice')], limit=1,
+        )
+        if not invoice:
+            return _json_error('Invoice not generated yet', 404)
+
+        # .with_user(user) — not plain .sudo() — the India-localization
+        # invoice template calls self.env.user.has_group(...) internally,
+        # which needs a real (singleton) uid, not just ACL bypass.
+        pdf, _ = request.env['ir.actions.report'].with_user(user).sudo()._render_qweb_pdf(
+            'account.account_invoices', invoice.id
+        )
+        filename = f"{invoice.name or order.name}.pdf".replace('/', '-')
+        return request.make_response(
+            pdf,
+            headers=[
+                ('Content-Type', 'application/pdf'),
+                ('Content-Length', len(pdf)),
+                ('Content-Disposition', f'attachment; filename="{filename}"'),
+            ],
+        )
 
     # ==========================================
     # PROMO CODES
@@ -927,6 +1379,186 @@ class LaundryAPI(http.Controller):
         pickups = request.env['laundry.pickup.request'].with_user(user).search(domain)
         return {"status": True, "data": [self._format_pickup(p, include_lines=True) for p in pickups]}
 
+    @http.route('/api/v1/rider/collect_payment', type='jsonrpc', auth='none', methods=['POST'], csrf=False)
+    def rider_collect_payment(self, **kwargs):
+        """
+        Rider: record a cash/UPI/card payment collected in person from the
+        customer (typically at delivery). Goes through the same
+        laundry.order._register_payment() funnel as online/wallet payments,
+        so amount_due and payment_status stay correct everywhere — customer
+        app, rider app, and Odoo — regardless of which channel paid.
+
+        Body:
+          pickup_id: int            — required
+          amount: float             — required, > 0, <= the order's amount_due
+          method: cash | upi | card — required
+        """
+        user, error = self._authenticate()
+        if error:
+            return error
+        if not self._is_rider(user) and not self._is_admin(user):
+            return {"status": False, "message": "Access denied: Rider role required"}
+
+        pickup_id = kwargs.get('pickup_id')
+        amount = kwargs.get('amount')
+        method = kwargs.get('method')
+        if not pickup_id or amount is None or not method:
+            return {"status": False, "message": "Missing pickup_id, amount or method"}
+        if method not in ('cash', 'upi', 'card'):
+            return {"status": False, "message": "Invalid method. Allowed: cash, upi, card"}
+
+        pr = request.env['laundry.pickup.request'].with_user(user).browse(int(pickup_id))
+        if not pr.exists():
+            return {"status": False, "message": "Pickup request not found"}
+        if not self._is_admin(user) and pr.laundry_person_id.id != user.id:
+            return {"status": False, "message": "Access denied: not your pickup"}
+        if not pr.order_id:
+            return {"status": False, "message": "This pickup has no order yet — mark it picked up first"}
+
+        try:
+            amount = float(amount)
+        except (TypeError, ValueError):
+            return {"status": False, "message": "Invalid amount"}
+        if amount <= 0:
+            return {"status": False, "message": "Amount must be greater than zero"}
+
+        order = pr.order_id.with_user(user)
+        if amount > order.amount_due + 0.01:
+            return {"status": False, "message": f"Amount exceeds the remaining due (Rs.{order.amount_due:.2f})"}
+
+        order.sudo()._register_payment(amount, method=method, source='rider_collected', collected_by=user)
+
+        return {
+            "status": True,
+            "message": "Payment recorded",
+            "data": self._format_order(order),
+        }
+
+    @http.route('/api/v1/rider/collection_summary', type='jsonrpc', auth='none', methods=['POST'], csrf=False)
+    def rider_collection_summary(self, **kwargs):
+        """
+        Rider: total collected in person (cash/UPI/card) over a period, for
+        the "Collected" stat on the Today/History screens. Admin sees every
+        rider's total; a rider sees only their own.
+
+        Body:
+          period: today | week  — optional, default 'today'
+        """
+        user, error = self._authenticate()
+        if error:
+            return error
+        if not self._is_rider(user) and not self._is_admin(user):
+            return {"status": False, "message": "Access denied: Rider role required"}
+
+        period = kwargs.get('period') or 'today'
+        now = fields.Datetime.now()
+        if period == 'week':
+            since = now - timedelta(days=7)
+        else:
+            since = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        domain = [
+            ('source', '=', 'rider_collected'),
+            ('create_date', '>=', since),
+        ]
+        if not self._is_admin(user):
+            domain.append(('collected_by_id', '=', user.id))
+
+        logs = request.env['laundry.payment.log'].sudo().search(domain)
+        return {
+            "status": True,
+            "data": {
+                "collected_amount": sum(logs.mapped('amount')),
+                "collections_count": len(logs),
+                "period": period,
+            }
+        }
+
+    # ==========================================
+    # ADMIN — RIDER ASSIGNMENT
+    # ==========================================
+    #
+    # A pickup's `laundry_person_id` (labelled "Rider" on the model) is what
+    # rider_pickups() above filters on — until an admin sets it, the pickup
+    # is invisible to every rider's app and can never get picked up.
+
+    @http.route('/api/v1/admin/riders', type='jsonrpc', auth='none', methods=['POST'], csrf=False)
+    def admin_list_riders(self, **kwargs):
+        """Admin: list all riders, for the pickup assignment picker."""
+        user, error = self._authenticate()
+        if error:
+            return error
+        if not self._is_admin(user):
+            return {"status": False, "message": "Access denied: Admin only"}
+
+        rider_group = request.env.ref('laundry_management.group_laundry_rider')
+        riders = request.env['res.users'].sudo().search([('group_ids', 'in', [rider_group.id])])
+        Pickup = request.env['laundry.pickup.request'].sudo()
+        return {
+            "status": True,
+            "data": [
+                {
+                    "id": r.id,
+                    "name": r.name,
+                    "active_pickups": Pickup.search_count([
+                        ('laundry_person_id', '=', r.id), ('state', 'in', ('scheduled', 'picked')),
+                    ]),
+                }
+                for r in riders
+            ]
+        }
+
+    @http.route('/api/v1/admin/pickup/assign_rider', type='jsonrpc', auth='none', methods=['POST'], csrf=False)
+    def admin_assign_rider(self, **kwargs):
+        """
+        Admin: assign (or reassign) a rider to a pickup request. A pickup
+        still in 'draft' automatically moves to 'scheduled' once assigned —
+        matching what action_schedule() already does when a rider claims a
+        pickup themselves — and notifies the customer + rider (see
+        laundry.push.service's write() hooks).
+
+        Body:
+          pickup_id: int — required
+          rider_id: int  — required
+        """
+        user, error = self._authenticate()
+        if error:
+            return error
+        if not self._is_admin(user):
+            return {"status": False, "message": "Access denied: Admin only"}
+
+        pickup_id = kwargs.get('pickup_id')
+        rider_id = kwargs.get('rider_id')
+        if not pickup_id or not rider_id:
+            return {"status": False, "message": "Missing pickup_id or rider_id"}
+
+        # with_user(user), not sudo() — action_schedule() below posts a
+        # chatter message via message_post(), which needs self.env.user to
+        # resolve to a real (singleton) user. Plain sudo() keeps whatever
+        # uid an auth='none' request started with (often none), so
+        # self.env.user ends up empty and message_post() raises
+        # "Expected singleton: res.users()". with_user(user) carries the
+        # real authenticated admin through, same as rider_pickup_action().
+        pr = request.env['laundry.pickup.request'].with_user(user).browse(int(pickup_id))
+        if not pr.exists():
+            return {"status": False, "message": "Pickup request not found"}
+        if pr.state in ('delivered', 'cancel'):
+            return {"status": False, "message": f"Cannot assign a rider to a pickup in state '{pr.state}'"}
+
+        rider = request.env['res.users'].sudo().browse(int(rider_id))
+        if not rider.exists() or not self._is_rider(rider):
+            return {"status": False, "message": "Selected user is not a rider"}
+
+        pr.write({'laundry_person_id': rider.id})
+        if pr.state == 'draft':
+            pr.action_schedule()
+
+        return {
+            "status": True,
+            "message": "Rider assigned",
+            "data": self._format_pickup(pr, include_lines=True),
+        }
+
     # ==========================================
     # GARMENT TRACKING
     # ==========================================
@@ -1108,15 +1740,15 @@ class LaundryAPI(http.Controller):
             return {"status": False, "message": "Order not found"}
         if not self._is_admin(user) and order.partner_id != user.partner_id:
             return {"status": False, "message": "Access denied"}
-        if order.state in ('invoiced', 'cancel'):
-            return {"status": False, "message": f"Cannot pay an order in state '{order.state}'"}
-        if order.total_amount <= 0:
-            return {"status": False, "message": "Order has no amount to pay"}
-        if user.wallet_balance < order.total_amount:
+        if order.state == 'cancel':
+            return {"status": False, "message": "Cannot pay a cancelled order"}
+        if order.payment_status == 'paid' or order.amount_due <= 0:
+            return {"status": False, "message": "This order is already fully paid"}
+        if user.wallet_balance < order.amount_due:
             return {
                 "status": False,
                 "message": f"Insufficient wallet balance. "
-                           f"Available: {user.wallet_balance:.2f}, Required: {order.total_amount:.2f}",
+                           f"Available: {user.wallet_balance:.2f}, Required: {order.amount_due:.2f}",
             }
 
         try:
@@ -1130,7 +1762,9 @@ class LaundryAPI(http.Controller):
             "data": {
                 "order_id": order.id,
                 "order_name": order.name,
-                "amount_paid": order.total_amount,
+                "amount_paid": order.amount_paid,
+                "amount_due": order.amount_due,
+                "payment_status": order.payment_status,
                 "wallet_balance": user.wallet_balance,
             }
         }
@@ -1187,4 +1821,114 @@ class LaundryAPI(http.Controller):
             "status": True,
             "message": f"Action '{action}' completed",
             "data": self._format_pickup(pr, include_lines=True),
+        }
+
+    # ==========================================
+    # CONTRACT REQUESTS (B2B)
+    # ==========================================
+
+    @http.route('/api/v1/contract-request/create', type='jsonrpc', auth='none', methods=['POST'], csrf=False)
+    def create_contract_request(self, **kwargs):
+        """
+        Customer: submit a B2B enquiry (hotel/restaurant/hostel volume
+        pricing). Creates a `laundry.contract.request` linked to the
+        customer's own partner_id, in 'submitted' state — an admin picks it
+        up from there (see admin_contract_request_action below).
+
+        Body:
+          business_name: str   — required
+          contact_person: str  — required
+          business_type: str   — Hotel | Restaurant | Hostel | Other
+          phone: str           — required
+          notes: str           — optional
+        """
+        user, error = self._authenticate()
+        if error:
+            return error
+
+        business_name = (kwargs.get('business_name') or '').strip()
+        contact_person = (kwargs.get('contact_person') or '').strip()
+        phone = (kwargs.get('phone') or '').strip()
+        if not business_name or not contact_person or not phone:
+            return {"status": False, "message": "Missing business_name, contact_person or phone"}
+
+        business_type_map = {'hotel': 'hotel', 'restaurant': 'restaurant', 'hostel': 'hostel'}
+        company_type = business_type_map.get((kwargs.get('business_type') or '').strip().lower(), 'other')
+
+        req = request.env['laundry.contract.request'].sudo().create({
+            'partner_id': user.partner_id.id,
+            'business_name': business_name,
+            'contact_name': contact_person,
+            'email_from': user.partner_id.email or '',
+            'phone': phone,
+            'company_type': company_type,
+            'description': kwargs.get('notes') or '',
+        })
+        req.action_submit_request()
+
+        return {"status": True, "message": "Enquiry received", "data": self._format_contract_request(req)}
+
+    @http.route('/api/v1/admin/contract-requests', type='jsonrpc', auth='none', methods=['POST'], csrf=False)
+    def admin_list_contract_requests(self, **kwargs):
+        """Admin: list B2B contract requests. Optional `state` filter."""
+        user, error = self._authenticate()
+        if error:
+            return error
+        if not self._is_admin(user):
+            return {"status": False, "message": "Access denied: Admin only"}
+
+        domain = []
+        state_filter = kwargs.get('state')
+        if state_filter:
+            domain.append(('state', '=', state_filter))
+
+        requests = request.env['laundry.contract.request'].sudo().search(domain)
+        return {"status": True, "data": [self._format_contract_request(r) for r in requests]}
+
+    @http.route('/api/v1/admin/contract-request/action', type='jsonrpc', auth='none', methods=['POST'], csrf=False)
+    def admin_contract_request_action(self, **kwargs):
+        """
+        Admin: advance a contract request's lifecycle.
+
+        Body:
+          request_id: int  — required
+          action: negotiate | convert | cancel  — required
+        """
+        user, error = self._authenticate()
+        if error:
+            return error
+        if not self._is_admin(user):
+            return {"status": False, "message": "Access denied: Admin only"}
+
+        request_id = kwargs.get('request_id')
+        action = kwargs.get('action')
+        if not request_id or not action:
+            return {"status": False, "message": "Missing request_id or action"}
+
+        req = request.env['laundry.contract.request'].with_user(user).browse(int(request_id))
+        if not req.exists():
+            return {"status": False, "message": "Contract request not found"}
+
+        valid_actions_for_state = {
+            'submitted': ['negotiate', 'cancel'],
+            'in_negotiation': ['convert', 'cancel'],
+        }
+        allowed = valid_actions_for_state.get(req.state, [])
+        if action not in allowed:
+            return {
+                "status": False,
+                "message": f"Action '{action}' not allowed in state '{req.state}'. Allowed: {allowed}"
+            }
+
+        action_map = {
+            'negotiate': req.action_start_negotiation,
+            'convert': req.action_convert_to_contract,
+            'cancel': req.action_cancel,
+        }
+        action_map[action]()
+
+        return {
+            "status": True,
+            "message": f"Action '{action}' completed",
+            "data": self._format_contract_request(req),
         }

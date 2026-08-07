@@ -128,9 +128,9 @@
     <!-- Menu items -->
     <menuitem id="menu_laundry_garment"
               name="Garments"
-              parent="laundry_management.laundry_management_sub_menu"
+              parent="laundry_management.laundry_management_menu"
               action="action_laundry_garment"
-              sequence="20"
+              sequence="30"
               groups="laundry_management.group_laundry_manager,laundry_management.group_laundry_user"/>
 
 </odoo>

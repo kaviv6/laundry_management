@@ -32,3 +32,6 @@ access_laundry_contract_recurring_line_manager,access.laundry.contract.recurring
 access_laundry_service_zone_user,access.laundry.service.zone.user,model_laundry_service_zone,laundry_management.group_laundry_user,1,0,0,0
 access_laundry_service_zone_rider,access.laundry.service.zone.rider,model_laundry_service_zone,laundry_management.group_laundry_rider,1,0,0,0
 access_laundry_service_zone_manager,access.laundry.service.zone.manager,model_laundry_service_zone,laundry_management.group_laundry_manager,1,1,1,1
+access_laundry_payment_log_user,access.laundry.payment.log.user,model_laundry_payment_log,laundry_management.group_laundry_user,1,0,0,0
+access_laundry_payment_log_rider,access.laundry.payment.log.rider,model_laundry_payment_log,laundry_management.group_laundry_rider,1,0,0,0
+access_laundry_payment_log_manager,access.laundry.payment.log.manager,model_laundry_payment_log,laundry_management.group_laundry_manager,1,1,1,0

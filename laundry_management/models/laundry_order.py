@@ -61,6 +61,20 @@ class LaundryOrder(models.Model):
         ('online', 'Online Payment'),
         ('wallet', 'Wallet'),
     ], string='Payment Method', default='cod', tracking=True)
+    payment_log_ids = fields.One2many(
+        'laundry.payment.log', 'order_id', string='Payments',
+    )
+    amount_paid = fields.Float(
+        compute='_compute_payment_status', store=True, string='Amount Paid',
+    )
+    amount_due = fields.Float(
+        compute='_compute_payment_status', store=True, string='Amount Due',
+    )
+    payment_status = fields.Selection([
+        ('not_paid', 'Not Paid'),
+        ('partial', 'Partially Paid'),
+        ('paid', 'Paid'),
+    ], compute='_compute_payment_status', store=True, default='not_paid', string='Payment Status')
     pickup_request_ids = fields.One2many(
         'laundry.pickup.request', 'order_id', string='Pickup Requests', readonly=True,
     )
@@ -137,6 +151,19 @@ class LaundryOrder(models.Model):
             subtotal = sum(order.order_line_ids.mapped('amount'))
             order.total_amount = max(0.0, subtotal - order.promo_discount)
 
+    @api.depends('payment_log_ids.amount', 'total_amount')
+    def _compute_payment_status(self):
+        for order in self:
+            paid = sum(order.payment_log_ids.mapped('amount'))
+            order.amount_paid = paid
+            order.amount_due = max(0.0, order.total_amount - paid)
+            if paid <= 0:
+                order.payment_status = 'not_paid'
+            elif order.amount_due <= 0.01:
+                order.payment_status = 'paid'
+            else:
+                order.payment_status = 'partial'
+
     def _compute_invoice_count(self):
         for order in self:
             order.invoice_count = self.env['account.move'].search_count(
@@ -187,20 +214,59 @@ class LaundryOrder(models.Model):
         return discount_amount
 
     def action_wallet_pay(self):
-        """Pay the order total from the customer's wallet balance."""
+        """Pay the order's remaining balance from the customer's wallet."""
         self.ensure_one()
-        if self.state in ('invoiced', 'cancel'):
-            raise Exception(f"Cannot pay an order in state '{self.state}'.")
+        if self.state == 'cancel':
+            raise Exception("Cannot pay a cancelled order.")
+        if self.payment_status == 'paid':
+            raise Exception("This order is already fully paid.")
         user = self.env['res.users'].sudo().search(
             [('partner_id', '=', self.partner_id.id)], limit=1
         )
         if not user:
             raise Exception("No user account found for this customer.")
-        if self.total_amount <= 0:
+        amount = self.amount_due if self.amount_due > 0 else self.total_amount
+        if amount <= 0:
             raise Exception("Order has no amount to pay.")
-        user.wallet_deduct(self.total_amount)
+        user.wallet_deduct(amount)
         self.sudo().write({'payment_method': 'wallet'})
+        self._register_payment(amount, method='wallet', source='customer_wallet')
         return True
+
+    def _register_payment(self, amount, method, source, collected_by=None, transaction=None, reference=None):
+        """Single funnel for every way an order can get paid — online
+        (Cashfree webhook), wallet debit, or a rider collecting cash/UPI/card
+        in person. Keeps amount_paid/amount_due/payment_status correct
+        regardless of channel, and notifies the customer of the update."""
+        self.ensure_one()
+        if amount <= 0:
+            return
+        self.env['laundry.payment.log'].sudo().create({
+            'order_id': self.id,
+            'amount': amount,
+            'method': method,
+            'source': source,
+            'collected_by_id': collected_by.id if collected_by else False,
+            'transaction_id': transaction.id if transaction else False,
+            'reference': reference or '',
+        })
+        self.invalidate_recordset(['amount_paid', 'amount_due', 'payment_status'])
+
+        fully_paid = self.payment_status == 'paid'
+        title = 'Payment Received' if fully_paid else 'Partial Payment Received'
+        body = f'We received Rs.{amount:.0f} for order {self.name}. '
+        body += 'Fully paid — thank you!' if fully_paid else f'Remaining due: Rs.{self.amount_due:.0f}'
+
+        users = self.env['res.users'].sudo().search([
+            ('partner_id', '=', self.partner_id.id), ('push_token', '!=', False),
+        ])
+        self.env['laundry.push.service']._notify_users(
+            users, title, body,
+            data={
+                'type': 'order', 'order_id': str(self.id),
+                'state': self.state, 'payment_status': self.payment_status,
+            },
+        )
 
     def close_order(self):
         self.state = 'order'
@@ -212,7 +278,10 @@ class LaundryOrder(models.Model):
 
     def _build_invoice(self, use_sudo=False):
         """Create, populate and post an invoice for this order. Returns the move."""
-        env = self.env if not use_sudo else self.env.sudo()
+        # Environment has no .sudo() (that's a recordset method) — the
+        # correct way to get a superuser copy of an environment itself is
+        # calling it with su=True.
+        env = self.env if not use_sudo else self.env(su=True)
         product = self.env.ref('laundry_management.product_product_laundry_service')
         invoice = env['account.move'].create({
             'partner_id': self.partner_id.id,

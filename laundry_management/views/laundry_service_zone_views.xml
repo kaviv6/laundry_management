@@ -63,17 +63,21 @@
         </field>
     </record>
 
-    <!-- Configuration submenu under Laundry Management -->
+    <!-- Top-level "Configuration" tab — the single home for every setup
+         item (Products, Service Types, Pricelists, Service Zones, Settings).
+         Loaded before service_type_views.xml/laundry_pricelist_views.xml/
+         res_config_settings_views.xml (see __manifest__.py) since they
+         parent onto this menu. -->
     <menuitem id="menu_laundry_configuration"
               name="Configuration"
-              parent="laundry_management.laundry_management_sub_menu"
-              sequence="99"
+              parent="laundry_management.laundry_management_menu"
+              sequence="70"
               groups="laundry_management.group_laundry_manager"/>
 
     <menuitem id="menu_laundry_service_zones"
               name="Service Zones"
               parent="laundry_management.menu_laundry_configuration"
               action="action_laundry_service_zone"
-              sequence="1"
+              sequence="40"
               groups="laundry_management.group_laundry_manager"/>
 </odoo>
